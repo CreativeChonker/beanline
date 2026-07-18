@@ -115,21 +115,21 @@ app.get('/signup', (req, res) => {
   res.render('signup', { error: null });
 });
 
-app.post('/signup', (req, res) => {
-  const { name, email, password, role } = req.body;
-  if (!name || !email || !password || !['customer', 'staff'].includes(role)) {
+app.post('/signup', async (req, res, next) => {
+  const { name, email, password } = req.body;
+  if (!name || !email || !password) {
     return res.render('signup', { error: 'Please fill out all fields.' });
   }
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-  if (existing) {
-    return res.render('signup', { error: 'An account with that email already exists.' });
+  try {
+    const user = await users.createCustomer(db, { name, email, password });
+    req.session.user = { id: user.id, name: user.name, email: user.email, role: user.role, shopId: null };
+    res.redirect('/welcome');
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.render('signup', { error: 'An account with that email already exists.' });
+    }
+    next(err);
   }
-  const password_hash = bcrypt.hashSync(password, 10);
-  const info = db
-    .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run(name, email, password_hash, role);
-  req.session.user = { id: info.lastInsertRowid, name, email, role };
-  res.redirect(role === 'staff' ? '/dashboard' : '/order');
 });
 
 app.get('/login', (req, res) => {
