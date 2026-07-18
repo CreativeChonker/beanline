@@ -60,6 +60,15 @@ test('requireRole rejects an unlisted role with 403', () => {
   assert.equal(nextCalled, false);
 });
 
+test('requireRole rejects with 403 when there is no session user at all', () => {
+  const req = { session: {} };
+  const res = fakeRes();
+  let nextCalled = false;
+  requireRole('owner', 'staff')(req, res, () => { nextCalled = true; });
+  assert.equal(res.statusCode, 403);
+  assert.equal(nextCalled, false);
+});
+
 test('loadShopBySlug sets req.shop for a known slug', async () => {
   const shop = await shops.createShop(db, { name: 'Blue Bottle', slug: 'blue-bottle' });
   const req = { params: { shopSlug: 'blue-bottle' } };
