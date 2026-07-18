@@ -7,6 +7,8 @@ const menu = require('./menu');
 const shops = require('./models/shops');
 const users = require('./models/users');
 const orders = require('./models/orders');
+const menuItems = require('./models/menuItems');
+const seedMenu = require('./db/seed-menu');
 const { requireAuth, requireRole, loadShopBySlug } = require('./middleware/auth');
 
 const app = express();
@@ -52,6 +54,9 @@ app.post('/shops/new', async (req, res, next) => {
     const result = await db.withTransaction(async (client) => {
       const shop = await shops.createShop(client, { name: shopName, slug });
       const owner = await users.createOwner(client, { name: ownerName, email, password, shopId: shop.id });
+      for (const item of seedMenu) {
+        await menuItems.createMenuItem(client, { shopId: shop.id, ...item });
+      }
       return { shop, owner };
     });
     req.session.user = {

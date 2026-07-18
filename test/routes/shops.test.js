@@ -70,3 +70,14 @@ test('POST /shops/new with missing fields re-renders the form with an error', as
   assert.equal(res.status, 200);
   assert.match(res.text, /fill out all fields/);
 });
+
+test('POST /shops/new seeds a starter menu for the new shop', async () => {
+  const app = require('../../server');
+  await request(app).post('/shops/new').type('form').send({
+    shopName: 'Blue Bottle', slug: 'blue-bottle', ownerName: 'Alex Owner', email: 'alex-seed@bluebottle.test', password: 'hunter2',
+  });
+  const shopRow = await db.query('SELECT id FROM shops WHERE slug = $1', ['blue-bottle']);
+  const items = await db.query('SELECT * FROM menu_items WHERE shop_id = $1', [shopRow.rows[0].id]);
+  assert.equal(items.rows.length, 6);
+  assert.ok(items.rows.every((i) => i.available === true));
+});
