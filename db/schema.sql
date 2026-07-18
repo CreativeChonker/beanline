@@ -34,6 +34,22 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS orders_shop_id_idx ON orders(shop_id);
 CREATE INDEX IF NOT EXISTS users_shop_id_idx ON users(shop_id);
 
+ALTER TABLE orders ALTER COLUMN user_id DROP NOT NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS staff_user_id INTEGER REFERENCES users(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'orders_customer_xor_staff'
+  ) THEN
+    ALTER TABLE orders ADD CONSTRAINT orders_customer_xor_staff CHECK (
+      (user_id IS NOT NULL AND staff_user_id IS NULL) OR
+      (user_id IS NULL AND staff_user_id IS NOT NULL)
+    );
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS menu_items (
   id SERIAL PRIMARY KEY,
   shop_id INTEGER NOT NULL REFERENCES shops(id),

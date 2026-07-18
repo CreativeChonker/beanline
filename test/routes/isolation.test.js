@@ -69,3 +69,29 @@ test('a customer can order from two different shops with one account', async () 
   const orderCount = await db.query('SELECT count(*) FROM orders WHERE user_id = (SELECT id FROM users WHERE email = $1)', ['sam@example.com']);
   assert.equal(Number(orderCount.rows[0].count), 2);
 });
+
+test('a POS sale rung up by shop A\'s staff can never touch shop B\'s menu, even with a crafted item id', async () => {
+  const app = require('../../server');
+
+  const ownerA = request.agent(app);
+  await ownerA.post('/shops/new').type('form').send({
+    shopName: 'Blue Bottle', slug: 'blue-bottle', ownerName: 'Alex A', email: 'alex-pos@a.test', password: 'hunter2',
+  });
+
+  const ownerB = request.agent(app);
+  await ownerB.post('/shops/new').type('form').send({
+    shopName: 'Ritual', slug: 'ritual', ownerName: 'Robin B', email: 'robin-pos@b.test', password: 'hunter2',
+  });
+
+  const shopBRow = await db.query('SELECT id FROM shops WHERE slug = $1', ['ritual']);
+  const shopBItem = await db.query('SELECT id FROM menu_items WHERE shop_id = $1 LIMIT 1', [shopBRow.rows[0].id]);
+
+  // Shop A's owner tries to ring up shop B's item id on their own POS.
+  const res = await ownerA.post('/pos').type('form').send({ ['qty_' + shopBItem.rows[0].id]: '1', paymentMethod: 'cash' });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /select at least one item/);
+
+  const shopARow = await db.query('SELECT id FROM shops WHERE slug = $1', ['blue-bottle']);
+  const salesForShopA = await db.query('SELECT * FROM orders WHERE shop_id = $1', [shopARow.rows[0].id]);
+  assert.equal(salesForShopA.rows.length, 0);
+});
