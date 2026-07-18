@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head><title>Menu · Coffee Shop</title><%- include('partials-head') %>
+<style>
+  .menu-editor-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+  .menu-items-table { width: 100%; border-collapse: collapse; }
+  .menu-items-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .menu-items-table td { padding: 12px 18px; border-bottom: 1px solid var(--parchment-2); font-size: 14px; vertical-align: middle; }
+  .menu-items-table tr:last-child td { border-bottom: none; }
+  .menu-items-table tr.unavailable { opacity: 0.5; }
+  .item-price { font-family: var(--font-mono); }
+  .row-actions { display: flex; gap: 8px; }
+  .row-actions form { display: inline; }
+  .btn-small { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); text-decoration: none; }
+  .btn-small:hover { border-color: var(--gold); color: var(--gold-deep); }
+  .btn-small.danger:hover { border-color: var(--cherry); color: var(--cherry-deep); }
+  .add-item-panel { background: var(--parchment); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .add-item-form { display: grid; grid-template-columns: 2fr 1fr 1fr 2fr auto; gap: 10px; align-items: end; }
+  .add-item-form .field { margin: 0; }
+</style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="app-sidebar">
+      <div class="app-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+        <span>Coffee Shop</span>
+      </div>
+      <a class="app-nav-item" href="/dashboard">Orders</a>
+      <a class="app-nav-item active" href="/menu">Menu</a>
+      <div class="app-sidebar-foot">
+        <div class="who">Owner · <%= user.name %></div>
+        <a href="/logout">Log out</a>
+      </div>
+    </div>
+
+    <div class="app-main">
+      <div class="app-topbar">
+        <h1 style="font-size:26px;">Menu</h1>
+      </div>
+      <% if (error) { %><p class="order-error"><%= error %></p><% } %>
+
+      <div class="menu-editor-panel">
+        <% if (items.length === 0) { %>
+          <div class="empty-state">
+            <h3>No items yet</h3>
+            <p>Add your first menu item below.</p>
+          </div>
+        <% } else { %>
+          <table class="menu-items-table">
+            <thead>
+              <tr><th>Item</th><th>Category</th><th>Price</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              <% items.forEach(item => { %>
+                <tr class="<%= item.available ? '' : 'unavailable' %>">
+                  <td><strong><%= item.name %></strong><br><span style="color:var(--ink-soft);font-size:12px;"><%= item.note %></span></td>
+                  <td><%= item.category %></td>
+                  <td class="item-price">$<%= item.price.toFixed(2) %></td>
+                  <td><%= item.available ? 'Available' : 'Unavailable' %></td>
+                  <td class="row-actions">
+                    <a class="btn-small" href="/menu/<%= item.id %>/edit">Edit</a>
+                    <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small"><%= item.available ? 'Mark sold out' : 'Mark available' %></button></form>
+                    <form method="POST" action="/menu/<%= item.id %>/delete"><button type="submit" class="btn-small danger">Delete</button></form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+
+      <div class="add-item-panel">
+        <h3 style="margin-bottom:14px;">Add an item</h3>
+        <form method="POST" action="/menu" class="add-item-form">
+          <div class="field"><label for="name">Name</label><input id="name" name="name" type="text" required></div>
+          <div class="field"><label for="category">Category</label><input id="category" name="category" type="text" required></div>
+          <div class="field"><label for="price">Price</label><input id="price" name="price" type="number" step="0.01" min="0.01" required></div>
+          <div class="field"><label for="note">Note</label><input id="note" name="note" type="text"></div>
+          <button type="submit" class="btn btn-primary" style="margin-top:0;">Add</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

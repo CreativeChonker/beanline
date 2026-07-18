@@ -216,6 +216,79 @@ app.get('/dashboard', requireAuth, requireRole('owner', 'staff'), async (req, re
   }
 });
 
+// --- Owner menu editor ---
+
+app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId);
+    res.render('menu-edit', { items, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
+  const { name, category, price, note } = req.body;
+  const parsedPrice = parseFloat(price);
+  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+    const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId);
+    return res.render('menu-edit', { items, error: 'Please provide a name, category, and a valid price.' });
+  }
+  try {
+    await menuItems.createMenuItem(db, { shopId: req.session.user.shopId, name, category, price: parsedPrice, note: note || '' });
+    res.redirect('/menu');
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/menu/:id/edit', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const item = await menuItems.getMenuItemById(db, req.session.user.shopId, req.params.id);
+    if (!item) return res.status(404).send('Item not found.');
+    res.render('menu-item-edit', { item, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/menu/:id', requireAuth, requireRole('owner'), async (req, res, next) => {
+  const { name, category, price, note } = req.body;
+  const parsedPrice = parseFloat(price);
+  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+    const item = await menuItems.getMenuItemById(db, req.session.user.shopId, req.params.id);
+    if (!item) return res.status(404).send('Item not found.');
+    return res.render('menu-item-edit', { item, error: 'Please provide a name, category, and a valid price.' });
+  }
+  try {
+    const updated = await menuItems.updateMenuItem(db, req.session.user.shopId, req.params.id, { name, category, price: parsedPrice, note: note || '' });
+    if (!updated) return res.status(404).send('Item not found.');
+    res.redirect('/menu');
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/menu/:id/toggle', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const updated = await menuItems.toggleAvailability(db, req.session.user.shopId, req.params.id);
+    if (!updated) return res.status(404).send('Item not found.');
+    res.redirect('/menu');
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/menu/:id/delete', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const deleted = await menuItems.deleteMenuItem(db, req.session.user.shopId, req.params.id);
+    if (!deleted) return res.status(404).send('Item not found.');
+    res.redirect('/menu');
+  } catch (err) {
+    next(err);
+  }
+});
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Coffee shop app running at http://localhost:${PORT}`);
