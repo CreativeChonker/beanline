@@ -4,14 +4,15 @@
   "private": true,
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate": "node db/migrate.js"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "ejs": "^3.1.10",
-    "bcrypt": "^5.1.1",
-    "better-sqlite3": "^11.3.0",
-    "dotenv": "^16.4.5"
+    "pg": "^8.22.0"
   }
 }
