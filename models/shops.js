@@ -36,4 +36,29 @@ async function getShopByInviteCode(queryable, inviteCode) {
   return result.rows[0] || null;
 }
 
-module.exports = { createShop, getShopBySlug, getShopByInviteCode, SLUG_RE };
+async function getShopById(queryable, id) {
+  const result = await queryable.query(
+    'SELECT id, name, slug, tagline, cover_photo_url FROM shops WHERE id = $1',
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+async function updateShopProfile(queryable, id, { tagline, coverPhotoUrl }) {
+  const result = await queryable.query(
+    `UPDATE shops SET tagline = $1, cover_photo_url = COALESCE($2, cover_photo_url)
+     WHERE id = $3
+     RETURNING id, name, slug, tagline, cover_photo_url`,
+    [tagline, coverPhotoUrl, id]
+  );
+  return result.rows[0] || null;
+}
+
+async function getAllShops(queryable) {
+  const result = await queryable.query(
+    'SELECT id, name, slug, tagline, cover_photo_url FROM shops ORDER BY name ASC'
+  );
+  return result.rows;
+}
+
+module.exports = { createShop, getShopBySlug, getShopByInviteCode, getShopById, updateShopProfile, getAllShops, SLUG_RE };
