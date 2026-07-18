@@ -26,7 +26,6 @@
   .menu-card.just-added { border-color: var(--gold); background: rgba(217,164,65,0.06); }
   .menu-name { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; line-height: 1.2; }
   .menu-price { font-family: var(--font-mono); color: var(--gold-deep); font-weight: 500; font-size: 13.5px; margin-top: 6px; }
-  .no-results { grid-column: 1 / -1; text-align: center; color: var(--ink-soft); padding: 40px 0; font-size: 14px; }
   .bill-panel { width: 300px; flex-shrink: 0; position: sticky; top: 30px; }
   .bill-empty { color: var(--ink-soft); font-size: 13px; padding: 6px 0 2px; }
   .bill-item { display: flex; justify-content: space-between; align-items: flex-start; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink); padding: 7px 0; }
@@ -94,13 +93,12 @@
       <div class="content">
         <div class="menu-grid" id="menu-grid">
           <% menu.forEach(item => { %>
-            <div class="menu-card" data-category="<%= item.category %>" data-name="<%= item.name.toLowerCase() %>"
+            <div class="menu-card" data-category="<%= item.category %>"
               data-id="<%= item.id %>" data-item-name="<%= item.name %>" data-price="<%= item.price %>">
               <div class="menu-name"><%= item.name %></div>
               <div class="menu-price">$<%= item.price.toFixed(2) %></div>
             </div>
           <% }) %>
-          <p class="no-results" id="no-results" hidden>Nothing matches that search.</p>
         </div>
 
         <div class="bill-panel">
