@@ -11,8 +11,11 @@ const PORT = process.env.PORT || 3000;
 app.set('view engine', 'ejs');
 app.set('views', __dirname + '/views');
 app.use(express.urlencoded({ extended: true }));
+const pgSession = require('connect-pg-simple')(session);
+
 app.use(
   session({
+    store: new pgSession({ pool: db.pool, createTableIfMissing: true }),
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
