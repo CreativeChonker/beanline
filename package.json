@@ -9,6 +9,7 @@
     "test": "node --require ./testHelpers/setup.js --test --test-concurrency=1"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1090.0",
     "bcrypt": "^5.1.1",
     "connect-pg-simple": "^10.0.0",
     "dotenv": "^16.4.5",
