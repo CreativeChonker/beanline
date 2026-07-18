@@ -6,6 +6,8 @@ const db = require('./db');
 const menu = require('./menu');
 const shops = require('./models/shops');
 const users = require('./models/users');
+const orders = require('./models/orders');
+const { requireAuth, requireRole, loadShopBySlug } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,20 +31,6 @@ app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
   next();
 });
-
-function requireAuth(req, res, next) {
-  if (!req.session.user) return res.redirect('/login');
-  next();
-}
-
-function requireRole(role) {
-  return (req, res, next) => {
-    if (!req.session.user || req.session.user.role !== role) {
-      return res.status(403).send('Forbidden: this page requires a ' + role + ' account.');
-    }
-    next();
-  };
-}
 
 app.get('/', (req, res) => {
   if (!req.session.user) return res.redirect('/login');
@@ -159,11 +147,11 @@ app.get('/welcome', requireAuth, requireRole('customer'), (req, res) => {
   res.render('welcome');
 });
 
-app.get('/order', requireAuth, requireRole('customer'), (req, res) => {
-  res.render('order', { menu, error: null });
+app.get('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlug, (req, res) => {
+  res.render('order', { menu, error: null, shop: req.shop });
 });
 
-app.post('/order', requireAuth, requireRole('customer'), async (req, res) => {
+app.post('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlug, async (req, res, next) => {
   const items = [];
   let total = 0;
   for (const item of menu) {
@@ -175,35 +163,41 @@ app.post('/order', requireAuth, requireRole('customer'), async (req, res) => {
   }
 
   if (items.length === 0) {
-    return res.render('order', { menu, error: 'Please select at least one item.' });
+    return res.render('order', { menu, error: 'Please select at least one item.', shop: req.shop });
   }
-
-  const itemsSummary = items.map((i) => `${i.name} x${i.qty}`).join(', ');
-  const info = db
-    .prepare('INSERT INTO orders (user_id, items_json, total) VALUES (?, ?, ?)')
-    .run(req.session.user.id, JSON.stringify(items), total);
-
-  const order = {
-    order_id: info.lastInsertRowid,
-    customer_name: req.session.user.name,
-    customer_email: req.session.user.email,
-    items: itemsSummary,
-    lineItems: items,
-    total: total.toFixed(2),
-    created_at: new Date().toISOString(),
-  };
 
   try {
-    await fetch(process.env.N8N_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(order),
+    const created = await orders.createOrder(db, {
+      userId: req.session.user.id,
+      shopId: req.shop.id,
+      items,
+      total,
     });
-  } catch (err) {
-    console.error('Failed to notify n8n webhook:', err.message);
-  }
 
-  res.render('confirmation', { order });
+    const order = {
+      order_id: created.id,
+      customer_name: req.session.user.name,
+      customer_email: req.session.user.email,
+      items: items.map((i) => `${i.name} x${i.qty}`).join(', '),
+      lineItems: items,
+      total: total.toFixed(2),
+      created_at: created.created_at,
+    };
+
+    try {
+      await fetch(process.env.N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order),
+      });
+    } catch (err) {
+      console.error('Failed to notify n8n webhook:', err.message);
+    }
+
+    res.render('confirmation', { order, shop: req.shop });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Staff dashboard ---

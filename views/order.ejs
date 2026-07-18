@@ -116,7 +116,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
         <span>Coffee Shop</span>
       </div>
-      <a class="app-nav-item active" href="/order">Menu</a>
+      <a class="app-nav-item active" href="/<%= shop.slug %>/order">Menu</a>
       <div class="app-sidebar-foot">
         <div class="who"><%= user.name %></div>
         <a href="/logout">Log out</a>
@@ -189,7 +189,7 @@
               <div class="row"><span>Items</span><span id="bill-count">0</span></div>
               <div class="row total"><span>Total</span><span id="bill-total">$0.00</span></div>
             </div>
-            <form method="POST" action="/order" id="order-form">
+            <form method="POST" action="/<%= shop.slug %>/order" id="order-form">
               <div id="hidden-inputs"></div>
               <button type="submit" class="process-btn" id="process-btn" disabled>Place order</button>
             </form>
