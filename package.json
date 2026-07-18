@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "migrate": "node db/migrate.js",
-    "test": "node --require ./testHelpers/setup.js --test"
+    "test": "node --require ./testHelpers/setup.js --test --test-concurrency=1"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
