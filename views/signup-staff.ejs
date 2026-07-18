@@ -1,0 +1,40 @@
+<!-- views/signup-staff.ejs -->
+<!doctype html>
+<html>
+<head><title>Join Your Shop · Coffee Shop</title><%- include('partials-head') %></head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-mark enter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+        <span>Coffee Shop</span>
+      </div>
+      <div class="panel enter enter-1">
+        <h2>Join your shop</h2>
+        <p class="sub">Enter the invite code your shop owner gave you.</p>
+        <% if (error) { %><p class="form-error"><%= error %></p><% } %>
+        <form method="POST" action="/signup/staff">
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" type="text" name="name" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" name="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" type="password" name="password" autocomplete="new-password" required>
+          </div>
+          <div class="field">
+            <label for="inviteCode">Invite code</label>
+            <input id="inviteCode" type="text" name="inviteCode" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Join shop</button>
+        </form>
+      </div>
+      <p class="panel-foot enter enter-2">Starting a new shop instead? <a href="/shops/new">Create one</a></p>
+    </div>
+  </div>
+</body>
+</html>

@@ -86,6 +86,31 @@ app.post('/shops/new', async (req, res, next) => {
   }
 });
 
+app.get('/signup/staff', (req, res) => {
+  res.render('signup-staff', { error: null });
+});
+
+app.post('/signup/staff', async (req, res, next) => {
+  const { name, email, password, inviteCode } = req.body;
+  if (!name || !email || !password || !inviteCode) {
+    return res.render('signup-staff', { error: 'Please fill out all fields.' });
+  }
+  try {
+    const shop = await shops.getShopByInviteCode(db, inviteCode);
+    if (!shop) {
+      return res.render('signup-staff', { error: 'Invalid invite code.' });
+    }
+    const user = await users.createStaff(db, { name, email, password, shopId: shop.id });
+    req.session.user = { id: user.id, name: user.name, email: user.email, role: user.role, shopId: shop.id };
+    res.redirect('/dashboard');
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.render('signup-staff', { error: 'An account with that email already exists.' });
+    }
+    next(err);
+  }
+});
+
 app.get('/signup', (req, res) => {
   res.render('signup', { error: null });
 });
