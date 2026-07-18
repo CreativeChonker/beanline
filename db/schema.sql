@@ -33,3 +33,16 @@ CREATE TABLE IF NOT EXISTS orders (
 
 CREATE INDEX IF NOT EXISTS orders_shop_id_idx ON orders(shop_id);
 CREATE INDEX IF NOT EXISTS users_shop_id_idx ON users(shop_id);
+
+CREATE TABLE IF NOT EXISTS menu_items (
+  id SERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id),
+  name TEXT NOT NULL,
+  price NUMERIC(10,2) NOT NULL,
+  category TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  available BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS menu_items_shop_id_idx ON menu_items(shop_id);
