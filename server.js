@@ -4,6 +4,8 @@ const session = require('express-session');
 const bcrypt = require('bcrypt');
 const db = require('./db');
 const menu = require('./menu');
+const shops = require('./models/shops');
+const users = require('./models/users');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,6 +51,40 @@ app.get('/', (req, res) => {
 });
 
 // --- Auth ---
+
+app.get('/shops/new', (req, res) => {
+  res.render('shop-new', { error: null });
+});
+
+app.post('/shops/new', async (req, res, next) => {
+  const { shopName, slug, ownerName, email, password } = req.body;
+  if (!shopName || !slug || !ownerName || !email || !password) {
+    return res.render('shop-new', { error: 'Please fill out all fields.' });
+  }
+  try {
+    const result = await db.withTransaction(async (client) => {
+      const shop = await shops.createShop(client, { name: shopName, slug });
+      const owner = await users.createOwner(client, { name: ownerName, email, password, shopId: shop.id });
+      return { shop, owner };
+    });
+    req.session.user = {
+      id: result.owner.id,
+      name: result.owner.name,
+      email: result.owner.email,
+      role: result.owner.role,
+      shopId: result.shop.id,
+    };
+    res.redirect('/dashboard');
+  } catch (err) {
+    if (err.message === 'INVALID_SLUG') {
+      return res.render('shop-new', { error: 'Shop URL can only contain lowercase letters, numbers, and hyphens.' });
+    }
+    if (err.code === '23505') {
+      return res.render('shop-new', { error: 'That shop URL or email is already taken.' });
+    }
+    next(err);
+  }
+});
 
 app.get('/signup', (req, res) => {
   res.render('signup', { error: null });
