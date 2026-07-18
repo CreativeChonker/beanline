@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id INTEGER NOT NULL REFERENCES users(id),
   shop_id INTEGER NOT NULL REFERENCES shops(id),
   items_json TEXT NOT NULL,
-  total REAL NOT NULL,
+  total NUMERIC(10,2) NOT NULL,
   status TEXT NOT NULL DEFAULT 'received',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

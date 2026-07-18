@@ -8,7 +8,7 @@ async function createOrder(queryable, { userId, shopId, items, total }) {
 
 async function getOrdersForShop(queryable, shopId) {
   const result = await queryable.query(
-    `SELECT orders.id, orders.items_json, orders.total, orders.status, orders.created_at,
+    `SELECT orders.id, orders.items_json, orders.total::float8 AS total, orders.status, orders.created_at,
             users.name AS customer_name, users.email AS customer_email
      FROM orders
      JOIN users ON users.id = orders.user_id
