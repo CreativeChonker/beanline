@@ -202,19 +202,13 @@ app.post('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlu
 
 // --- Staff dashboard ---
 
-app.get('/dashboard', requireAuth, requireRole('staff'), (req, res) => {
-  const orders = db
-    .prepare(
-      `SELECT orders.id, orders.items_json, orders.total, orders.status, orders.created_at,
-              users.name AS customer_name, users.email AS customer_email
-       FROM orders
-       JOIN users ON users.id = orders.user_id
-       ORDER BY orders.created_at DESC`
-    )
-    .all()
-    .map((o) => ({ ...o, items: JSON.parse(o.items_json) }));
-
-  res.render('dashboard', { orders });
+app.get('/dashboard', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
+  try {
+    const shopOrders = await orders.getOrdersForShop(db, req.session.user.shopId);
+    res.render('dashboard', { orders: shopOrders });
+  } catch (err) {
+    next(err);
+  }
 });
 
 if (require.main === module) {
