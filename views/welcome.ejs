@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head><title>Welcome · Coffee Shop</title><%- include('partials-head') %></head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-mark enter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+        <span>Coffee Shop</span>
+      </div>
+      <div class="panel enter enter-1">
+        <h2>Welcome, <%= user.name %></h2>
+        <p class="sub">Have a link from a shop? Open it to start an order. Otherwise, ask your favorite shop for their ordering link.</p>
+      </div>
+      <p class="panel-foot enter enter-2"><a href="/logout">Log out</a></p>
+    </div>
+  </div>
+</body>
+</html>

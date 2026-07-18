@@ -46,8 +46,7 @@ function requireRole(role) {
 
 app.get('/', (req, res) => {
   if (!req.session.user) return res.redirect('/login');
-  if (req.session.user.role === 'staff') return res.redirect('/dashboard');
-  return res.redirect('/order');
+  return res.redirect(req.session.user.role === 'customer' ? '/welcome' : '/dashboard');
 });
 
 // --- Auth ---
@@ -136,14 +135,18 @@ app.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res, next) => {
   const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-    return res.render('login', { error: 'Invalid email or password.' });
+  try {
+    const user = await users.getUserByEmail(db, email);
+    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+      return res.render('login', { error: 'Invalid email or password.' });
+    }
+    req.session.user = { id: user.id, name: user.name, email: user.email, role: user.role, shopId: user.shop_id };
+    return res.redirect(user.role === 'customer' ? '/welcome' : '/dashboard');
+  } catch (err) {
+    next(err);
   }
-  req.session.user = { id: user.id, name: user.name, email: user.email, role: user.role };
-  res.redirect(user.role === 'staff' ? '/dashboard' : '/order');
 });
 
 app.get('/logout', (req, res) => {
@@ -151,6 +154,10 @@ app.get('/logout', (req, res) => {
 });
 
 // --- Customer ordering ---
+
+app.get('/welcome', requireAuth, requireRole('customer'), (req, res) => {
+  res.render('welcome');
+});
 
 app.get('/order', requireAuth, requireRole('customer'), (req, res) => {
   res.render('order', { menu, error: null });
