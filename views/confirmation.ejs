@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head><title>Order #<%= order.order_id %> · Coffee Shop</title><%- include('partials-head') %>
+<style>
+  .confirm-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--espresso);
+    padding: 40px 20px;
+  }
+  .confirm-wrap { width: 100%; max-width: 340px; }
+  .confirm-mark {
+    display: flex; align-items: center; gap: 9px; justify-content: center;
+    margin-bottom: 22px; color: var(--cream-ink);
+  }
+  .confirm-mark svg { width: 22px; height: 22px; color: var(--gold); }
+  .confirm-mark span { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.02em; }
+  .receipt-head { text-align: center; margin-bottom: 16px; }
+  .receipt-head .stamp {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--gold-deep);
+    border: 1px solid var(--gold-deep);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin-bottom: 10px;
+  }
+  .receipt-head h2 { font-size: 21px; }
+  .receipt-head p { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-soft); }
+  .receipt-order-no { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+  .receipt-items { margin: 18px 0 4px; }
+  .receipt-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font-mono); font-weight: 500; font-size: 15px;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+  }
+  .receipt-total .amt { font-size: 18px; font-weight: 600; }
+  .confirm-again {
+    display: block; text-align: center; margin-top: 22px;
+    color: var(--cream-ink-soft); font-size: 13.5px; text-decoration: none;
+  }
+  .confirm-again:hover { color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="confirm-shell">
+    <div class="confirm-wrap">
+      <div class="confirm-mark enter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+        <span>COFFEE SHOP</span>
+      </div>
+      <div class="receipt enter enter-1">
+        <div class="receipt-head">
+          <span class="stamp">Order received</span>
+          <h2>Thanks, <%= order.customer_name.split(' ')[0] %></h2>
+          <p class="receipt-order-no">Order #<%= String(order.order_id).padStart(4, '0') %></p>
+        </div>
+        <div class="receipt-items">
+          <% order.lineItems.forEach(item => { %>
+            <div class="receipt-line">
+              <span><%= item.name %> &times;<%= item.qty %></span>
+              <span class="dots"></span>
+              <span>$<%= (item.price * item.qty).toFixed(2) %></span>
+            </div>
+          <% }) %>
+        </div>
+        <div class="receipt-total">
+          <span>Total</span>
+          <span class="amt">$<%= order.total %></span>
+        </div>
+      </div>
+      <a href="/order" class="confirm-again enter enter-2">Place another order &rarr;</a>
+    </div>
+  </div>
+</body>
+</html>

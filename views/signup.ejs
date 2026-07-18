@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head><title>Sign Up · Coffee Shop</title><%- include('partials-head') %></head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-mark enter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+        <span>Coffee Shop</span>
+      </div>
+      <div class="panel enter enter-1">
+        <h2>Create an account</h2>
+        <p class="sub">Order ahead, or sign up as staff to run the till.</p>
+        <% if (error) { %><p class="form-error"><%= error %></p><% } %>
+        <form method="POST" action="/signup">
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" type="text" name="name" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" name="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" type="password" name="password" autocomplete="new-password" required>
+          </div>
+          <div class="field">
+            <label for="role">I am a</label>
+            <select id="role" name="role">
+              <option value="customer">Customer</option>
+              <option value="staff">Staff</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Sign up</button>
+        </form>
+      </div>
+      <p class="panel-foot enter enter-2">Already have an account? <a href="/login">Log in</a></p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head><title>Orders · Coffee Shop</title><%- include('partials-head') %>
+<style>
+  .orders-panel {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .orders-table { width: 100%; border-collapse: collapse; }
+  .orders-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    font-weight: 600;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .orders-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--parchment-2);
+    font-size: 14px;
+    vertical-align: top;
+  }
+  .orders-table tr:last-child td { border-bottom: none; }
+  .order-id { font-family: var(--font-mono); color: var(--ink-soft); }
+  .cust-name { font-weight: 600; }
+  .cust-email { color: var(--ink-soft); font-size: 12.5px; }
+  .order-total { font-family: var(--font-mono); font-weight: 600; }
+  .status-pill {
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(217,164,65,0.16);
+    color: var(--gold-deep);
+  }
+  .order-time { color: var(--ink-soft); font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
+  .empty-state h3 { font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+  .orders-table tbody tr { opacity: 0; animation: rise 0.3s ease forwards; }
+</style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="app-sidebar">
+      <div class="app-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+        <span>Coffee Shop</span>
+      </div>
+      <a class="app-nav-item active" href="/dashboard">Orders</a>
+      <div class="app-sidebar-foot">
+        <div class="who">Staff · <%= user.name %></div>
+        <a href="/logout">Log out</a>
+      </div>
+    </div>
+
+    <div class="app-main">
+      <div class="app-topbar">
+        <h1 style="font-size:26px;">Orders</h1>
+        <div class="app-user">
+          <div class="avatar"><%= user.name.charAt(0).toUpperCase() %></div>
+          <span><%= user.name %></span>
+        </div>
+      </div>
+
+      <div class="orders-panel enter">
+        <% if (orders.length === 0) { %>
+          <div class="empty-state">
+            <h3>No orders yet</h3>
+            <p>Orders placed at the counter will show up here as they come in.</p>
+          </div>
+        <% } else { %>
+          <table class="orders-table">
+            <thead>
+              <tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Placed</th></tr>
+            </thead>
+            <tbody>
+              <% orders.forEach((o, i) => { %>
+                <tr style="animation-delay: <%= Math.min(i, 8) * 0.03 %>s">
+                  <td class="order-id">#<%= String(o.id).padStart(4, '0') %></td>
+                  <td>
+                    <div class="cust-name"><%= o.customer_name %></div>
+                    <div class="cust-email"><%= o.customer_email %></div>
+                  </td>
+                  <td><%= o.items.map(i => `${i.name} ×${i.qty}`).join(', ') %></td>
+                  <td class="order-total">$<%= o.total.toFixed(2) %></td>
+                  <td><span class="status-pill"><%= o.status %></span></td>
+                  <td class="order-time"><%= o.created_at %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
