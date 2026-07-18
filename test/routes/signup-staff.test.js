@@ -48,6 +48,9 @@ test('POST /signup/staff with an invalid invite code re-renders with an error', 
   });
   assert.equal(res.status, 200);
   assert.match(res.text, /Invalid invite code/);
+
+  const userRow = await db.query('SELECT * FROM users WHERE email = $1', ['jamie2@example.com']);
+  assert.equal(userRow.rows.length, 0);
 });
 
 test('POST /signup/staff with missing fields re-renders with an error', async () => {
