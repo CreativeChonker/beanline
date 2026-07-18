@@ -86,8 +86,13 @@
                 <tr style="animation-delay: <%= Math.min(i, 8) * 0.03 %>s">
                   <td class="order-id">#<%= String(o.id).padStart(4, '0') %></td>
                   <td>
-                    <div class="cust-name"><%= o.customer_name %></div>
-                    <div class="cust-email"><%= o.customer_email %></div>
+                    <% if (o.customer_name) { %>
+                      <div class="cust-name"><%= o.customer_name %></div>
+                      <div class="cust-email"><%= o.customer_email %></div>
+                    <% } else { %>
+                      <div class="cust-name">Walk-in</div>
+                      <div class="cust-email">rung up by <%= o.staff_name %></div>
+                    <% } %>
                   </td>
                   <td><%= o.items.map(i => `${i.name} ×${i.qty}`).join(', ') %></td>
                   <td class="order-total">$<%= o.total.toFixed(2) %></td>

@@ -82,3 +82,20 @@ test('GET /dashboard does not leak another shop\'s orders', async () => {
   assert.match(blueBottleDashboard.text, /Sam Rivera/);
   assert.doesNotMatch(blueBottleDashboard.text, /Taylor Kim/);
 });
+
+test('GET /dashboard shows walk-in sales distinctly from self-orders', async () => {
+  const app = require('../../server');
+  const ownerAgent = request.agent(app);
+  await ownerAgent.post('/shops/new').type('form').send({
+    shopName: 'Blue Bottle', slug: 'blue-bottle', ownerName: 'Alex Owner', email: 'alex-walkin@bluebottle.test', password: 'hunter2',
+  });
+  const shopRow = await db.query('SELECT id FROM shops WHERE slug = $1', ['blue-bottle']);
+  const itemRow = await db.query('SELECT id FROM menu_items WHERE shop_id = $1 LIMIT 1', [shopRow.rows[0].id]);
+
+  await ownerAgent.post('/pos').type('form').send({ ['qty_' + itemRow.rows[0].id]: '1', paymentMethod: 'cash' });
+
+  const res = await ownerAgent.get('/dashboard');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Walk-in/);
+  assert.match(res.text, /rung up by Alex Owner/);
+});
