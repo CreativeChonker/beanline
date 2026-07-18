@@ -152,6 +152,10 @@ app.get('/dashboard', requireAuth, requireRole('staff'), (req, res) => {
   res.render('dashboard', { orders });
 });
 
-app.listen(PORT, () => {
-  console.log(`Coffee shop app running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Coffee shop app running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
