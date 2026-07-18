@@ -221,6 +221,60 @@ app.get('/dashboard', requireAuth, requireRole('owner', 'staff'), async (req, re
   }
 });
 
+app.get('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
+  try {
+    const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true });
+    res.render('pos', { menu: items, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
+  const { paymentMethod } = req.body;
+  try {
+    const availableItems = await menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true });
+    const items = [];
+    let total = 0;
+    for (const item of availableItems) {
+      const qty = parseInt(req.body['qty_' + item.id], 10) || 0;
+      if (qty > 0) {
+        items.push({ name: item.name, qty, price: item.price });
+        total += qty * item.price;
+      }
+    }
+
+    if (items.length === 0) {
+      return res.render('pos', { menu: availableItems, error: 'Please select at least one item.' });
+    }
+    if (!['cash', 'card'].includes(paymentMethod)) {
+      return res.render('pos', { menu: availableItems, error: 'Please choose a payment method.' });
+    }
+
+    const created = await orders.createOrder(db, {
+      staffUserId: req.session.user.id,
+      shopId: req.session.user.shopId,
+      items,
+      total,
+      status: 'completed',
+      paymentMethod,
+    });
+
+    res.render('pos-receipt', {
+      sale: {
+        order_id: created.id,
+        staff_name: req.session.user.name,
+        lineItems: items,
+        total: total.toFixed(2),
+        payment_method: paymentMethod,
+        created_at: created.created_at,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- Owner menu editor ---
 
 app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {

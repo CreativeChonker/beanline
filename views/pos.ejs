@@ -1,0 +1,225 @@
+<!-- views/pos.ejs -->
+<!doctype html>
+<html>
+<head><title>POS · Coffee Shop</title><%- include('partials-head') %>
+<style>
+  .categories { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+  .category-pill {
+    padding: 7px 15px; border-radius: 999px; background: #fff; border: 1px solid var(--line);
+    font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .category-pill.active { background: var(--espresso); color: var(--gold); border-color: var(--espresso); }
+  .content { display: flex; gap: 24px; align-items: flex-start; }
+  .menu-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .menu-card {
+    background: #fff; border-radius: 12px; padding: 16px; border: 1px solid var(--line);
+    opacity: 0; animation: rise 0.35s ease forwards; cursor: pointer;
+  }
+  .menu-card:nth-child(1) { animation-delay: 0.02s; }
+  .menu-card:nth-child(2) { animation-delay: 0.06s; }
+  .menu-card:nth-child(3) { animation-delay: 0.10s; }
+  .menu-card:nth-child(4) { animation-delay: 0.14s; }
+  .menu-card:nth-child(5) { animation-delay: 0.18s; }
+  .menu-card:nth-child(6) { animation-delay: 0.22s; }
+  .menu-card:hover { border-color: var(--gold); }
+  .menu-card.just-added { border-color: var(--gold); background: rgba(217,164,65,0.06); }
+  .menu-name { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; line-height: 1.2; }
+  .menu-price { font-family: var(--font-mono); color: var(--gold-deep); font-weight: 500; font-size: 13.5px; margin-top: 6px; }
+  .no-results { grid-column: 1 / -1; text-align: center; color: var(--ink-soft); padding: 40px 0; font-size: 14px; }
+  .bill-panel { width: 300px; flex-shrink: 0; position: sticky; top: 30px; }
+  .bill-empty { color: var(--ink-soft); font-size: 13px; padding: 6px 0 2px; }
+  .bill-item { display: flex; justify-content: space-between; align-items: flex-start; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink); padding: 7px 0; }
+  .bill-item .qty-name { flex: 1; padding-right: 8px; }
+  .bill-item .remove { background: none; border: none; color: var(--cherry); cursor: pointer; font-family: var(--font-body); font-size: 11px; padding: 0; margin-left: 8px; text-decoration: underline; }
+  .bill-totals-wrap { background: #fffdf8; border: 1px solid var(--line); border-top: none; padding: 4px 20px 20px; }
+  .bill-totals .row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--ink-soft); margin-top: 6px; font-family: var(--font-mono); }
+  .bill-totals .row.total { font-weight: 600; font-size: 16px; color: var(--ink); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .payment-row { display: flex; gap: 8px; margin-top: 14px; }
+  .payment-choice { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); font-weight: 600; font-size: 13px; cursor: pointer; text-align: center; }
+  .payment-choice.selected { border-color: var(--espresso); background: var(--espresso); color: var(--gold); }
+  .process-btn {
+    width: 100%; margin-top: 16px; padding: 12px; border-radius: 9px; border: none;
+    background: var(--gold); color: var(--espresso); font-weight: 700; font-size: 14px; cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .process-btn:hover:not(:disabled) { background: var(--gold-deep); }
+  .process-btn:active:not(:disabled) { transform: scale(0.98); }
+  .process-btn:disabled { background: var(--parchment-2); color: var(--ink-soft); cursor: not-allowed; }
+  .order-error { color: var(--cherry-deep); background: rgba(156,59,44,0.08); border: 1px solid rgba(156,59,44,0.3); padding: 10px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 16px; }
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
+  .empty-state h3 { font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+  @media (max-width: 860px) {
+    .content { flex-direction: column; }
+    .bill-panel { width: 100%; position: static; }
+  }
+</style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="app-sidebar">
+      <div class="app-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+        <span>Coffee Shop</span>
+      </div>
+      <a class="app-nav-item" href="/dashboard">Orders</a>
+      <a class="app-nav-item" href="/menu">Menu</a>
+      <a class="app-nav-item active" href="/pos">POS</a>
+      <div class="app-sidebar-foot">
+        <div class="who"><%= user.name %></div>
+        <a href="/logout">Log out</a>
+      </div>
+    </div>
+
+    <div class="app-main">
+      <div class="app-topbar">
+        <h1 style="font-size:26px;">New sale</h1>
+      </div>
+      <% if (error) { %><p class="order-error"><%= error %></p><% } %>
+
+      <% if (menu.length === 0) { %>
+        <div class="empty-state">
+          <h3>No items yet</h3>
+          <p>This shop hasn't added anything to their menu yet.</p>
+        </div>
+      <% } else { %>
+      <% const categories = [...new Set(menu.map((i) => i.category))]; %>
+      <div class="categories" id="categories">
+        <div class="category-pill active" data-category="all">All</div>
+        <% categories.forEach((cat) => { %>
+          <div class="category-pill" data-category="<%= cat %>"><%= cat %></div>
+        <% }) %>
+      </div>
+
+      <div class="content">
+        <div class="menu-grid" id="menu-grid">
+          <% menu.forEach(item => { %>
+            <div class="menu-card" data-category="<%= item.category %>" data-name="<%= item.name.toLowerCase() %>"
+              data-id="<%= item.id %>" data-item-name="<%= item.name %>" data-price="<%= item.price %>">
+              <div class="menu-name"><%= item.name %></div>
+              <div class="menu-price">$<%= item.price.toFixed(2) %></div>
+            </div>
+          <% }) %>
+          <p class="no-results" id="no-results" hidden>Nothing matches that search.</p>
+        </div>
+
+        <div class="bill-panel">
+          <div class="receipt">
+            <h2>Current sale</h2>
+            <div id="bill-list"><p class="bill-empty">Tap an item to add it.</p></div>
+          </div>
+          <div class="bill-totals-wrap">
+            <div class="bill-totals">
+              <div class="row"><span>Items</span><span id="bill-count">0</span></div>
+              <div class="row total"><span>Total</span><span id="bill-total">$0.00</span></div>
+            </div>
+            <div class="payment-row">
+              <div class="payment-choice" data-method="cash">Cash</div>
+              <div class="payment-choice" data-method="card">Card</div>
+            </div>
+            <form method="POST" action="/pos" id="pos-form">
+              <div id="hidden-inputs"></div>
+              <input type="hidden" name="paymentMethod" id="payment-method-input">
+              <button type="submit" class="process-btn" id="process-btn" disabled>Complete sale</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <script>
+    const cart = {};
+    let selectedPayment = null;
+
+    document.querySelectorAll('.category-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        const activeCat = pill.dataset.category;
+        document.querySelectorAll('.menu-card').forEach(card => {
+          card.style.display = (activeCat === 'all' || card.dataset.category === activeCat) ? '' : 'none';
+        });
+      });
+    });
+
+    document.querySelectorAll('.menu-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.dataset.id;
+        const name = card.dataset.itemName;
+        const price = parseFloat(card.dataset.price);
+        if (cart[id]) {
+          cart[id].qty += 1;
+        } else {
+          cart[id] = { name, price, qty: 1 };
+        }
+        renderBill();
+        card.classList.add('just-added');
+        setTimeout(() => card.classList.remove('just-added'), 400);
+      });
+    });
+
+    document.querySelectorAll('.payment-choice').forEach(choice => {
+      choice.addEventListener('click', () => {
+        document.querySelectorAll('.payment-choice').forEach(c => c.classList.remove('selected'));
+        choice.classList.add('selected');
+        selectedPayment = choice.dataset.method;
+        document.getElementById('payment-method-input').value = selectedPayment;
+        updateProcessButton();
+      });
+    });
+
+    function removeFromCart(id) {
+      delete cart[id];
+      renderBill();
+    }
+
+    function updateProcessButton() {
+      const hasItems = Object.keys(cart).length > 0;
+      document.getElementById('process-btn').disabled = !(hasItems && selectedPayment);
+    }
+
+    function renderBill() {
+      const billList = document.getElementById('bill-list');
+      const hiddenInputs = document.getElementById('hidden-inputs');
+      const ids = Object.keys(cart);
+
+      hiddenInputs.innerHTML = '';
+      if (ids.length === 0) {
+        billList.innerHTML = '<p class="bill-empty">Tap an item to add it.</p>';
+        document.getElementById('bill-count').textContent = '0';
+        document.getElementById('bill-total').textContent = '$0.00';
+        updateProcessButton();
+        return;
+      }
+
+      let total = 0;
+      let count = 0;
+      billList.innerHTML = ids.map(id => {
+        const item = cart[id];
+        total += item.price * item.qty;
+        count += item.qty;
+        return `<div class="receipt-line bill-item">
+          <span class="qty-name">${item.name} &times;${item.qty}</span>
+          <span class="dots"></span>
+          <span>$${(item.price * item.qty).toFixed(2)}</span>
+          <button type="button" class="remove" onclick="removeFromCart('${id}')">remove</button>
+        </div>`;
+      }).join('');
+
+      ids.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'qty_' + id;
+        input.value = cart[id].qty;
+        hiddenInputs.appendChild(input);
+      });
+
+      document.getElementById('bill-count').textContent = count;
+      document.getElementById('bill-total').textContent = '$' + total.toFixed(2);
+      updateProcessButton();
+    }
+  </script>
+</body>
+</html>
