@@ -3,7 +3,6 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const db = require('./db');
-const menu = require('./menu');
 const shops = require('./models/shops');
 const users = require('./models/users');
 const orders = require('./models/orders');
@@ -152,26 +151,32 @@ app.get('/welcome', requireAuth, requireRole('customer'), (req, res) => {
   res.render('welcome');
 });
 
-app.get('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlug, (req, res) => {
-  res.render('order', { menu, error: null, shop: req.shop });
+app.get('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlug, async (req, res, next) => {
+  try {
+    const items = await menuItems.getMenuItemsForShop(db, req.shop.id, { availableOnly: true });
+    res.render('order', { menu: items, error: null, shop: req.shop });
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.post('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlug, async (req, res, next) => {
-  const items = [];
-  let total = 0;
-  for (const item of menu) {
-    const qty = parseInt(req.body['qty_' + item.id], 10) || 0;
-    if (qty > 0) {
-      items.push({ name: item.name, qty, price: item.price });
-      total += qty * item.price;
-    }
-  }
-
-  if (items.length === 0) {
-    return res.render('order', { menu, error: 'Please select at least one item.', shop: req.shop });
-  }
-
   try {
+    const availableItems = await menuItems.getMenuItemsForShop(db, req.shop.id, { availableOnly: true });
+    const items = [];
+    let total = 0;
+    for (const item of availableItems) {
+      const qty = parseInt(req.body['qty_' + item.id], 10) || 0;
+      if (qty > 0) {
+        items.push({ name: item.name, qty, price: item.price });
+        total += qty * item.price;
+      }
+    }
+
+    if (items.length === 0) {
+      return res.render('order', { menu: availableItems, error: 'Please select at least one item.', shop: req.shop });
+    }
+
     const created = await orders.createOrder(db, {
       userId: req.session.user.id,
       shopId: req.shop.id,
