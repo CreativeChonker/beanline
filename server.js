@@ -297,14 +297,23 @@ app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
 });
 
 app.post('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
-  const { name, category, price, note } = req.body;
+  const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
   const parsedPrice = parseFloat(price);
-  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+  const type = itemType === 'food' ? 'food' : 'drink';
+  const parseSize = (v) => {
+    if (v === undefined || v === '') return null;
+    const n = parseFloat(v);
+    return Number.isNaN(n) || n <= 0 ? undefined : n;
+  };
+  const parsedMedium = parseSize(priceMedium);
+  const parsedLarge = parseSize(priceLarge);
+  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
+      || parsedMedium === undefined || parsedLarge === undefined) {
     const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId);
     return res.render('menu-edit', { items, error: 'Please provide a name, category, and a valid price.' });
   }
   try {
-    await menuItems.createMenuItem(db, { shopId: req.session.user.shopId, name, category, price: parsedPrice, note: note || '' });
+    await menuItems.createMenuItem(db, { shopId: req.session.user.shopId, name, category, price: parsedPrice, note: note || '', itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge });
     res.redirect('/menu');
   } catch (err) {
     next(err);
@@ -322,15 +331,24 @@ app.get('/menu/:id/edit', requireAuth, requireRole('owner'), async (req, res, ne
 });
 
 app.post('/menu/:id', requireAuth, requireRole('owner'), async (req, res, next) => {
-  const { name, category, price, note } = req.body;
+  const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
   const parsedPrice = parseFloat(price);
-  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+  const type = itemType === 'food' ? 'food' : 'drink';
+  const parseSize = (v) => {
+    if (v === undefined || v === '') return null;
+    const n = parseFloat(v);
+    return Number.isNaN(n) || n <= 0 ? undefined : n;
+  };
+  const parsedMedium = parseSize(priceMedium);
+  const parsedLarge = parseSize(priceLarge);
+  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
+      || parsedMedium === undefined || parsedLarge === undefined) {
     const item = await menuItems.getMenuItemById(db, req.session.user.shopId, req.params.id);
     if (!item) return res.status(404).send('Item not found.');
     return res.render('menu-item-edit', { item, error: 'Please provide a name, category, and a valid price.' });
   }
   try {
-    const updated = await menuItems.updateMenuItem(db, req.session.user.shopId, req.params.id, { name, category, price: parsedPrice, note: note || '' });
+    const updated = await menuItems.updateMenuItem(db, req.session.user.shopId, req.params.id, { name, category, price: parsedPrice, note: note || '', itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge });
     if (!updated) return res.status(404).send('Item not found.');
     res.redirect('/menu');
   } catch (err) {

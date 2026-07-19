@@ -121,3 +121,39 @@ test('POST /menu/:id/delete removes the item, and 404s for a cross-shop id', asy
   const gone = await db.query('SELECT * FROM menu_items WHERE id = $1', [ownItem.rows[0].id]);
   assert.equal(gone.rows.length, 0);
 });
+
+test('POST /menu creates a food item and a drink with size prices', async () => {
+  const app = require('../../server');
+  const { agent } = await ownerAgentWithShop(app);
+  await agent.post('/menu').type('form').send({
+    name: 'Test Latte', category: 'Coffee', price: '4.50', itemType: 'drink', priceMedium: '5.00', priceLarge: '5.50',
+  });
+  await agent.post('/menu').type('form').send({
+    name: 'Test Croissant', category: 'Food', price: '3.25', itemType: 'food',
+  });
+  const rows = await db.query("SELECT name, item_type, price_medium::float8 AS pm, price_large::float8 AS pl FROM menu_items WHERE name IN ('Test Latte', 'Test Croissant') ORDER BY name");
+  assert.deepEqual(rows.rows, [
+    { name: 'Test Croissant', item_type: 'food', pm: null, pl: null },
+    { name: 'Test Latte', item_type: 'drink', pm: 5.0, pl: 5.5 },
+  ]);
+});
+
+test('POST /menu rejects an invalid size price without creating the item', async () => {
+  const app = require('../../server');
+  const { agent } = await ownerAgentWithShop(app);
+  const res = await agent.post('/menu').type('form').send({
+    name: 'Test Latte', category: 'Coffee', price: '4.50', itemType: 'drink', priceMedium: '-2',
+  });
+  assert.match(res.text, /valid price/i);
+  const rows = await db.query("SELECT COUNT(*)::int AS n FROM menu_items WHERE name = 'Test Latte'");
+  assert.equal(rows.rows[0].n, 0);
+});
+
+test('the menu editor uses plain language instead of "86 it"', async () => {
+  const app = require('../../server');
+  const { agent } = await ownerAgentWithShop(app);
+  await agent.post('/menu').type('form').send({ name: 'Test Latte', category: 'Coffee', price: '4.50', itemType: 'drink' });
+  const res = await agent.get('/menu');
+  assert.doesNotMatch(res.text, /86 it/);
+  assert.match(res.text, /Mark unavailable/);
+});

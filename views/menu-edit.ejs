@@ -36,7 +36,7 @@
   .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
   .empty-state h3 { font-size: 18px; color: var(--ink); margin-bottom: 6px; }
   .add-item-panel { background: var(--parchment); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
-  .add-item-form { display: grid; grid-template-columns: 2fr 1fr 1fr 2fr auto; gap: 10px; align-items: end; }
+  .add-item-form { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 10px; align-items: end; }
   .add-item-form .field { margin: 0; }
   @media (max-width: 760px) {
     .menu-row { flex-wrap: wrap; }
@@ -89,10 +89,10 @@
                     <% if (item.note) { %><div class="menu-row-note"><%= item.note %></div><% } %>
                   </div>
                   <span class="status-pill <%= item.available ? '' : 'sold-out' %>"><%= item.available ? 'Available' : 'Sold out' %></span>
-                  <div class="menu-row-price">$<%= item.price.toFixed(2) %></div>
+                  <div class="menu-row-price">$<%= item.price.toFixed(2) %><% if (item.price_medium) { %> / $<%= item.price_medium.toFixed(2) %><% } %><% if (item.price_large) { %> / $<%= item.price_large.toFixed(2) %><% } %></div>
                   <div class="menu-row-actions">
                     <a class="btn-small" href="/menu/<%= item.id %>/edit">Edit</a>
-                    <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small"><%= item.available ? '86 it' : 'Restock' %></button></form>
+                    <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small"><%= item.available ? 'Mark unavailable' : 'Restock' %></button></form>
                     <form method="POST" action="/menu/<%= item.id %>/delete"><button type="submit" class="btn-small danger">Remove</button></form>
                   </div>
                 </div>
@@ -107,7 +107,12 @@
         <form method="POST" action="/menu" class="add-item-form">
           <div class="field"><label for="name">Name</label><input id="name" name="name" type="text" required></div>
           <div class="field"><label for="category">Category</label><input id="category" name="category" type="text" required></div>
-          <div class="field"><label for="price">Price</label><input id="price" name="price" type="number" step="0.01" min="0.01" required></div>
+          <div class="field"><label for="itemType">Type</label>
+            <select id="itemType" name="itemType"><option value="drink">Drink</option><option value="food">Food</option></select>
+          </div>
+          <div class="field"><label for="price">Price (S / base)</label><input id="price" name="price" type="number" step="0.01" min="0.01" required></div>
+          <div class="field"><label for="priceMedium">Price M</label><input id="priceMedium" name="priceMedium" type="number" step="0.01" min="0.01"></div>
+          <div class="field"><label for="priceLarge">Price L</label><input id="priceLarge" name="priceLarge" type="number" step="0.01" min="0.01"></div>
           <div class="field"><label for="note">Note</label><input id="note" name="note" type="text"></div>
           <button type="submit" class="btn btn-primary" style="margin-top:0;">Add</button>
         </form>
