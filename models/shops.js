@@ -3,6 +3,9 @@ const crypto = require('crypto');
 
 const SLUG_RE = /^[a-z0-9-]+$/;
 
+const SHOP_COLUMNS = `id, name, slug, tagline, cover_photo_url,
+  pos_show_size, pos_show_sugar, pos_show_temp, pos_show_note, category_order`;
+
 function generateInviteCode() {
   return crypto.randomBytes(6).toString('hex');
 }
@@ -38,7 +41,7 @@ async function getShopByInviteCode(queryable, inviteCode) {
 
 async function getShopById(queryable, id) {
   const result = await queryable.query(
-    'SELECT id, name, slug, tagline, cover_photo_url FROM shops WHERE id = $1',
+    `SELECT ${SHOP_COLUMNS} FROM shops WHERE id = $1`,
     [id]
   );
   return result.rows[0] || null;
@@ -61,4 +64,21 @@ async function getAllShops(queryable) {
   return result.rows;
 }
 
-module.exports = { createShop, getShopBySlug, getShopByInviteCode, getShopById, updateShopProfile, getAllShops, SLUG_RE };
+async function updatePosOptions(queryable, id, { showSize, showSugar, showTemp, showNote }) {
+  const result = await queryable.query(
+    `UPDATE shops SET pos_show_size = $1, pos_show_sugar = $2, pos_show_temp = $3, pos_show_note = $4
+     WHERE id = $5 RETURNING ${SHOP_COLUMNS}`,
+    [showSize, showSugar, showTemp, showNote, id]
+  );
+  return result.rows[0] || null;
+}
+
+async function updateCategoryOrder(queryable, id, categories) {
+  const result = await queryable.query(
+    `UPDATE shops SET category_order = $1 WHERE id = $2 RETURNING ${SHOP_COLUMNS}`,
+    [categories, id]
+  );
+  return result.rows[0] || null;
+}
+
+module.exports = { createShop, getShopBySlug, getShopByInviteCode, getShopById, updateShopProfile, getAllShops, updatePosOptions, updateCategoryOrder, SLUG_RE };

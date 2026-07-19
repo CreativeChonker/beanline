@@ -105,3 +105,30 @@ test('getAllShops returns every shop ordered by name, including ones with no pro
   assert.equal(all[1].name, 'Ritual');
   assert.equal(all[1].tagline, null);
 });
+
+test('getShopById includes POS options defaulting to all-on and no category order', async () => {
+  const shop = await shops.createShop(db, { name: 'Blue Bottle', slug: 'blue-bottle' });
+  const found = await shops.getShopById(db, shop.id);
+  assert.equal(found.pos_show_size, true);
+  assert.equal(found.pos_show_sugar, true);
+  assert.equal(found.pos_show_temp, true);
+  assert.equal(found.pos_show_note, true);
+  assert.equal(found.category_order, null);
+});
+
+test('updatePosOptions turns individual fields off', async () => {
+  const shop = await shops.createShop(db, { name: 'Blue Bottle', slug: 'blue-bottle' });
+  const updated = await shops.updatePosOptions(db, shop.id, {
+    showSize: true, showSugar: false, showTemp: false, showNote: true,
+  });
+  assert.equal(updated.pos_show_size, true);
+  assert.equal(updated.pos_show_sugar, false);
+  assert.equal(updated.pos_show_temp, false);
+  assert.equal(updated.pos_show_note, true);
+});
+
+test('updateCategoryOrder stores and returns the section ordering', async () => {
+  const shop = await shops.createShop(db, { name: 'Blue Bottle', slug: 'blue-bottle' });
+  const updated = await shops.updateCategoryOrder(db, shop.id, ['Coffee', 'Tea', 'Food']);
+  assert.deepEqual(updated.category_order, ['Coffee', 'Tea', 'Food']);
+});
