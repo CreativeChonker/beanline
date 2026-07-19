@@ -20,6 +20,7 @@ const PORT = process.env.PORT || 3000;
 app.set('view engine', 'ejs');
 app.set('views', __dirname + '/views');
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 const pgSession = require('connect-pg-simple')(session);
 
 app.use(
@@ -277,6 +278,24 @@ app.post('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, ne
       },
       formatLine: posLines.formatLineDetails,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/pos/layout', requireAuth, requireRole('owner'), async (req, res, next) => {
+  const { categoryOrder, items } = req.body;
+  if (!Array.isArray(categoryOrder) || !Array.isArray(items)
+      || !categoryOrder.every((c) => typeof c === 'string')
+      || !items.every((i) => i && Number.isInteger(Number(i.id)) && typeof i.category === 'string' && Number.isInteger(Number(i.sortOrder)))) {
+    return res.status(400).send('Invalid layout.');
+  }
+  try {
+    await menuItems.updateLayout(db, req.session.user.shopId, items.map((i) => ({
+      id: Number(i.id), category: i.category, sortOrder: Number(i.sortOrder),
+    })));
+    await shops.updateCategoryOrder(db, req.session.user.shopId, categoryOrder);
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

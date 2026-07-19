@@ -64,6 +64,12 @@
   .customize-note { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font-size: 12.5px; margin-bottom: 10px; }
   .customize-add { width: 100%; }
   .bill-item .line-details { display: block; font-size: 11px; color: var(--ink-soft); }
+  .app-topbar { display: flex; align-items: center; justify-content: space-between; }
+  body.arranging .menu-card { cursor: grab; border-style: dashed; }
+  body.arranging .menu-card.dragging { opacity: 0.4; }
+  body.arranging .pos-section-head { cursor: grab; }
+  body.arranging .pos-section.drag-over .menu-grid { outline: 2px dashed var(--gold); outline-offset: 4px; border-radius: 10px; }
+  #arrange-toggle.on { background: var(--espresso); color: var(--gold); border-color: var(--espresso); }
 </style>
 </head>
 <body>
@@ -86,6 +92,9 @@
     <div class="app-main">
       <div class="app-topbar">
         <h1 style="font-size:26px;">New sale</h1>
+        <% if (user.role === 'owner' && menu.length > 0) { %>
+          <button type="button" class="btn-small" id="arrange-toggle">Arrange</button>
+        <% } %>
       </div>
       <% if (error) { %><p class="order-error"><%= error %></p><% } %>
 
@@ -335,6 +344,60 @@
       document.getElementById('bill-count').textContent = count;
       document.getElementById('bill-total').textContent = '$' + total.toFixed(2);
       updateProcessButton();
+    }
+
+    const arrangeToggle = document.getElementById('arrange-toggle');
+    if (arrangeToggle) {
+      let dragCard = null;
+
+      arrangeToggle.addEventListener('click', () => {
+        const on = document.body.classList.toggle('arranging');
+        arrangeToggle.classList.toggle('on', on);
+        arrangeToggle.textContent = on ? 'Done' : 'Arrange';
+        document.querySelectorAll('.menu-card').forEach((c) => { c.draggable = on; });
+        if (!on) saveLayout();
+      });
+
+      document.querySelectorAll('.menu-card').forEach((card) => {
+        card.addEventListener('dragstart', () => { dragCard = card; card.classList.add('dragging'); });
+        card.addEventListener('dragend', () => { card.classList.remove('dragging'); dragCard = null; });
+        card.addEventListener('dragover', (e) => {
+          if (!dragCard || dragCard === card) return;
+          e.preventDefault();
+          const rect = card.getBoundingClientRect();
+          const after = (e.clientX - rect.left) > rect.width / 2;
+          card.parentNode.insertBefore(dragCard, after ? card.nextSibling : card);
+        });
+      });
+
+      document.querySelectorAll('.pos-section').forEach((section) => {
+        const grid = section.querySelector('.menu-grid');
+        section.addEventListener('dragover', (e) => {
+          if (!dragCard) return;
+          e.preventDefault();
+          section.classList.add('drag-over');
+          if (!grid.contains(dragCard) && e.target.closest('.menu-grid') === grid && !e.target.closest('.menu-card')) {
+            grid.appendChild(dragCard);
+          }
+        });
+        section.addEventListener('dragleave', () => section.classList.remove('drag-over'));
+        section.addEventListener('drop', (e) => { e.preventDefault(); section.classList.remove('drag-over'); });
+      });
+
+      function saveLayout() {
+        const categoryOrder = [...document.querySelectorAll('.pos-section')].map((s) => s.dataset.category);
+        const items = [];
+        document.querySelectorAll('.pos-section').forEach((section) => {
+          [...section.querySelectorAll('.menu-card')].forEach((card, i) => {
+            items.push({ id: Number(card.dataset.id), category: section.dataset.category, sortOrder: i });
+          });
+        });
+        fetch('/pos/layout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ categoryOrder, items }),
+        });
+      }
     }
   </script>
 </body>
