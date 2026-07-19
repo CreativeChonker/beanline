@@ -1,19 +1,66 @@
 <!doctype html>
 <html>
-<head><title>Welcome · Coffee Shop</title><%- include('partials-head') %></head>
+<head><title>Coffee Shops · Coffee Shop</title><%- include('partials-head') %>
+<style>
+  .browse-shell { min-height: 100vh; background: var(--parchment); padding: 32px 20px; }
+  .browse-header { max-width: 640px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: space-between; }
+  .browse-header .mark { display: flex; align-items: center; gap: 9px; color: var(--ink); }
+  .browse-header .mark svg { width: 24px; height: 24px; color: var(--gold-deep); }
+  .browse-header .mark span { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+  .browse-header a { color: var(--ink-soft); font-size: 13px; text-decoration: none; }
+  .shop-feed { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .shop-card {
+    display: block; background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; text-decoration: none; color: inherit;
+    opacity: 0; animation: rise 0.35s ease forwards;
+  }
+  .shop-card:nth-child(1) { animation-delay: 0.02s; }
+  .shop-card:nth-child(2) { animation-delay: 0.06s; }
+  .shop-card:nth-child(3) { animation-delay: 0.10s; }
+  .shop-card:nth-child(4) { animation-delay: 0.14s; }
+  .shop-card:hover { border-color: var(--gold); }
+  .shop-card-photo { width: 100%; height: 160px; background: var(--parchment-2); display: flex; align-items: center; justify-content: center; color: var(--cherry); }
+  .shop-card-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .shop-card-body { padding: 16px 18px; }
+  .shop-card-name { font-family: var(--font-display); font-weight: 600; font-size: 17px; }
+  .shop-card-tagline { color: var(--ink-soft); font-size: 13.5px; margin-top: 4px; }
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
+  .empty-state h3 { font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+</style>
+</head>
 <body>
-  <div class="auth-shell">
-    <div class="auth-card">
-      <div class="auth-mark enter">
+  <div class="browse-shell">
+    <div class="browse-header">
+      <div class="mark">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
-        <span>Coffee Shop</span>
+        <span>Coffee Shops</span>
       </div>
-      <div class="panel enter enter-1">
-        <h2>Welcome, <%= user.name %></h2>
-        <p class="sub">Have a link from a shop? Open it to start an order. Otherwise, ask your favorite shop for their ordering link.</p>
-      </div>
-      <p class="panel-foot enter enter-2"><a href="/logout">Log out</a></p>
+      <a href="/logout">Log out</a>
     </div>
+    <% if (shops.length === 0) { %>
+      <div class="empty-state">
+        <h3>No shops yet</h3>
+        <p>Check back soon — new coffee shops are joining all the time.</p>
+      </div>
+    <% } else { %>
+      <div class="shop-feed">
+        <% shops.forEach(shop => { %>
+          <a class="shop-card" href="/<%= shop.slug %>/order">
+            <div class="shop-card-photo">
+              <% if (shop.cover_photo_url) { %>
+                <img src="<%= shop.cover_photo_url %>" alt="">
+              <% } else { %>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" width="36" height="36"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg>
+              <% } %>
+            </div>
+            <div class="shop-card-body">
+              <div class="shop-card-name"><%= shop.name %></div>
+              <% if (shop.tagline) { %><div class="shop-card-tagline"><%= shop.tagline %></div><% } %>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
   </div>
 </body>
 </html>

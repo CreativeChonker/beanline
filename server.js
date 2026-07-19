@@ -150,8 +150,13 @@ app.get('/logout', (req, res) => {
 
 // --- Customer ordering ---
 
-app.get('/welcome', requireAuth, requireRole('customer'), (req, res) => {
-  res.render('welcome');
+app.get('/welcome', requireAuth, requireRole('customer'), async (req, res, next) => {
+  try {
+    const allShops = await shops.getAllShops(db);
+    res.render('welcome', { shops: allShops });
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.get('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlug, async (req, res, next) => {
