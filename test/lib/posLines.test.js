@@ -61,3 +61,30 @@ test('formatLineDetails renders the compact combo', () => {
     'S'
   );
 });
+
+const cake = { id: 4, name: 'Carrot Cake', price: 4.0, price_medium: 38.0, price_large: null, item_type: 'cake' };
+const sliceOnly = { id: 5, name: 'Brownie Cake', price: 3.5, price_medium: null, price_large: null, item_type: 'cake' };
+const cakeMenu = [cake, sliceOnly, croissant];
+
+test('cakes price slice from base and whole from the second column', () => {
+  const result = parseAndPriceLines(JSON.stringify([
+    { itemId: 4, qty: 1, size: 'slice' },
+    { itemId: 4, qty: 1, size: 'whole' },
+  ]), cakeMenu);
+  assert.equal(result.error, undefined);
+  assert.equal(result.lines[0].price, 4.0);
+  assert.equal(result.lines[1].price, 38.0);
+  assert.equal(result.total, 42.0);
+});
+
+test('cake size validation: no whole when unset, no drink sizes, no sizes on food', () => {
+  assert.ok(parseAndPriceLines(JSON.stringify([{ itemId: 5, qty: 1, size: 'whole' }]), cakeMenu).error);
+  assert.ok(parseAndPriceLines(JSON.stringify([{ itemId: 4, qty: 1, size: 'large' }]), cakeMenu).error);
+  assert.ok(parseAndPriceLines(JSON.stringify([{ itemId: 3, qty: 1, size: 'slice' }]), cakeMenu).error);
+  assert.ok(parseAndPriceLines(JSON.stringify([{ itemId: 1, qty: 1, size: 'slice' }]), menu).error);
+});
+
+test('formatLineDetails labels cake sizes Slice and Whole', () => {
+  assert.equal(formatLineDetails({ name: 'Carrot Cake', qty: 1, price: 4, size: 'slice' }), 'Slice');
+  assert.equal(formatLineDetails({ name: 'Carrot Cake', qty: 1, price: 38, size: 'whole', note: 'birthday' }), 'Whole · "birthday"');
+});

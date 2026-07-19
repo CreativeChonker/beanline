@@ -335,12 +335,15 @@ function parseMenuItemForm(body, file) {
   if (file && !ITEM_IMAGE_TYPES.includes(file.mimetype)) {
     return { error: 'Please upload a JPG, PNG, or WEBP image.' };
   }
+  const type = ['food', 'cake'].includes(itemType) ? itemType : 'drink';
   return {
     fields: {
       name, category, note: note || '',
       price: parsedPrice,
-      itemType: itemType === 'food' ? 'food' : 'drink',
-      priceMedium: parsedMedium, priceLarge: parsedLarge,
+      itemType: type,
+      // food has one price; cakes price by slice (base) + whole (medium slot), never large
+      priceMedium: type === 'food' ? null : parsedMedium,
+      priceLarge: type === 'drink' ? parsedLarge : null,
     },
   };
 }

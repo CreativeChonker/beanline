@@ -125,6 +125,10 @@
         <div class="bill-panel">
           <div class="customize-panel" id="customize-panel" hidden>
             <div class="customize-name" id="customize-name"></div>
+            <div class="picker" data-picker="cakesize" id="picker-cakesize" style="display:none;">
+              <button type="button" data-value="slice">Slice</button>
+              <button type="button" data-value="whole">Whole</button>
+            </div>
             <% if (shop.pos_show_size) { %>
               <div class="picker" data-picker="size" id="picker-size">
                 <button type="button" data-value="small">S</button>
@@ -190,7 +194,7 @@
     };
 
     function itemSizePrice(card, size) {
-      if (size === 'medium') return card.dataset.priceMedium ? parseFloat(card.dataset.priceMedium) : null;
+      if (size === 'medium' || size === 'whole') return card.dataset.priceMedium ? parseFloat(card.dataset.priceMedium) : null;
       if (size === 'large') return card.dataset.priceLarge ? parseFloat(card.dataset.priceLarge) : null;
       return parseFloat(card.dataset.price);
     }
@@ -231,8 +235,12 @@
     document.querySelectorAll('.menu-card').forEach((card) => {
       card.addEventListener('click', () => {
         if (document.body.classList.contains('arranging')) return;
-        const isDrink = card.dataset.type === 'drink';
-        const hasPickers = isDrink && (SHOW.size || SHOW.sugar || SHOW.temp || SHOW.note);
+        const type = card.dataset.type;
+        const isDrink = type === 'drink';
+        const isCake = type === 'cake';
+        const cakeHasWhole = isCake && !!card.dataset.priceMedium;
+        const hasPickers = (isDrink && (SHOW.size || SHOW.sugar || SHOW.temp || SHOW.note))
+          || (isCake && (cakeHasWhole || SHOW.note));
         if (!hasPickers) {
           addLine({ itemId: Number(card.dataset.id), name: card.dataset.itemName, qty: 1, price: parseFloat(card.dataset.price) });
           card.classList.add('just-added');
@@ -248,9 +256,20 @@
             b.disabled = itemSizePrice(card, b.dataset.value) === null;
           });
           const singleSize = !card.dataset.priceMedium && !card.dataset.priceLarge;
-          sizePicker.style.display = singleSize ? 'none' : '';
+          sizePicker.style.display = (isDrink && !singleSize) ? '' : 'none';
           selectDefault('picker-size', 'small');
         }
+        const cakePicker = document.getElementById('picker-cakesize');
+        cakePicker.style.display = cakeHasWhole ? '' : 'none';
+        if (cakeHasWhole) {
+          cakePicker.querySelector('[data-value="slice"]').textContent = 'Slice $' + parseFloat(card.dataset.price).toFixed(2);
+          cakePicker.querySelector('[data-value="whole"]').textContent = 'Whole $' + parseFloat(card.dataset.priceMedium).toFixed(2);
+          selectDefault('picker-cakesize', 'slice');
+        }
+        const sugarPicker = document.getElementById('picker-sugar');
+        if (sugarPicker) sugarPicker.style.display = isCake ? 'none' : '';
+        const tempPicker = document.getElementById('picker-temp');
+        if (tempPicker) tempPicker.style.display = isCake ? 'none' : '';
         selectDefault('picker-sugar', 'normal');
         selectDefault('picker-temp', 'hot');
         const note = document.getElementById('customize-note');
@@ -260,15 +279,19 @@
 
     document.getElementById('customize-add')?.addEventListener('click', () => {
       if (!pending) return;
-      const size = (SHOW.size && pending.dataset.priceMedium) || (SHOW.size && pending.dataset.priceLarge) ? pickerValue('picker-size') : undefined;
+      const isCake = pending.dataset.type === 'cake';
+      const multiSize = pending.dataset.priceMedium || pending.dataset.priceLarge;
+      let size;
+      if (isCake) size = pending.dataset.priceMedium ? pickerValue('picker-cakesize') : undefined;
+      else size = SHOW.size && multiSize ? pickerValue('picker-size') : undefined;
       const line = {
         itemId: Number(pending.dataset.id),
         name: pending.dataset.itemName,
         qty: 1,
         price: itemSizePrice(pending, size),
         size,
-        sugar: pickerValue('picker-sugar'),
-        temperature: pickerValue('picker-temp'),
+        sugar: isCake ? undefined : pickerValue('picker-sugar'),
+        temperature: isCake ? undefined : pickerValue('picker-temp'),
       };
       const note = document.getElementById('customize-note');
       if (note && note.value.trim()) line.note = note.value.trim();
@@ -293,7 +316,7 @@
       document.getElementById('process-btn').disabled = !(cart.length > 0 && selectedPayment);
     }
 
-    const SIZE_LETTER = { small: 'S', medium: 'M', large: 'L' };
+    const SIZE_LETTER = { small: 'S', medium: 'M', large: 'L', slice: 'Slice', whole: 'Whole' };
     const SUGAR_LABEL = { none: 'no sugar', less: 'less sugar', extra: 'extra sugar' };
     function detailText(l) {
       const parts = [];

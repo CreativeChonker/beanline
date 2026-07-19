@@ -203,3 +203,57 @@ test('GET /pos shows item photos on cards and placeholders without one', async (
   assert.match(res.text, /class="menu-card-photo"[\s\S]*?src="http:\/\/img.test\/latte.jpg"/);
   assert.match(res.text, /menu-card-photo placeholder/);
 });
+
+test('POST /pos rings up a cake by the slice and whole with server-side pricing', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  const cake = await menuItems.createMenuItem(db, {
+    shopId, name: 'Test Carrot Cake', price: 4.0, category: 'Cakes', itemType: 'cake', priceMedium: 38.0,
+  });
+
+  const res = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([
+      { itemId: cake.id, qty: 2, size: 'slice' },
+      { itemId: cake.id, qty: 1, size: 'whole', price: 0.01 },
+    ]),
+  });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Whole/);
+
+  const order = await db.query("SELECT items_json, total::float8 AS total FROM orders WHERE shop_id = $1 ORDER BY id DESC LIMIT 1", [shopId]);
+  const items = JSON.parse(order.rows[0].items_json);
+  assert.equal(items[0].size, 'slice');
+  assert.equal(items[0].price, 4.0);
+  assert.equal(items[1].size, 'whole');
+  assert.equal(items[1].price, 38.0);
+  assert.equal(order.rows[0].total, 46.0);
+});
+
+test('POST /pos rejects drink sizes on cakes and whole when the cake has no whole price', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  const sliceOnly = await menuItems.createMenuItem(db, {
+    shopId, name: 'Test Brownie Cake', price: 3.5, category: 'Cakes', itemType: 'cake',
+  });
+
+  const bad1 = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash', lines: JSON.stringify([{ itemId: sliceOnly.id, qty: 1, size: 'large' }]),
+  });
+  assert.match(bad1.text, /does not come in that size/i);
+
+  const bad2 = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash', lines: JSON.stringify([{ itemId: sliceOnly.id, qty: 1, size: 'whole' }]),
+  });
+  assert.match(bad2.text, /does not come in that size/i);
+
+  const count = await db.query('SELECT COUNT(*)::int AS n FROM orders WHERE shop_id = $1', [shopId]);
+  assert.equal(count.rows[0].n, 0);
+});
+
+test('GET /pos renders the slice/whole picker markup', async () => {
+  const app = require('../../server');
+  const { agent } = await ownerAgentWithShop(app);
+  const res = await agent.get('/pos');
+  assert.match(res.text, /data-picker="cakesize"/);
+});

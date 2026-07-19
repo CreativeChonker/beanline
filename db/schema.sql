@@ -73,11 +73,17 @@ ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFA
 
 DO $$
 BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'menu_items_item_type_check'
+      AND pg_get_constraintdef(oid) NOT LIKE '%cake%'
+  ) THEN
+    ALTER TABLE menu_items DROP CONSTRAINT menu_items_item_type_check;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'menu_items_item_type_check'
   ) THEN
     ALTER TABLE menu_items ADD CONSTRAINT menu_items_item_type_check
-      CHECK (item_type IN ('drink', 'food'));
+      CHECK (item_type IN ('drink', 'food', 'cake'));
   END IF;
 END $$;
 

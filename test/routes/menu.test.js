@@ -256,3 +256,23 @@ test('a validation error keeps a typed new category in the re-rendered form', as
   assert.match(res.text, /id="categoryNew"[^>]*value="Pastries"/);
   assert.match(res.text, /value="__new__"\s+selected/);
 });
+
+test('POST /menu creates a cake with slice and whole prices, large always cleared', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  await agent.post('/menu').type('form').send({
+    name: 'Test Carrot Cake', category: 'Cakes', price: '4.00', itemType: 'cake', priceMedium: '38.00', priceLarge: '99.00',
+  });
+  const row = await db.query("SELECT item_type, price_medium::float8 AS pm, price_large::float8 AS pl FROM menu_items WHERE shop_id = $1 AND name = 'Test Carrot Cake'", [shopId]);
+  assert.deepEqual(row.rows[0], { item_type: 'cake', pm: 38.0, pl: null });
+});
+
+test('POST /menu clears size prices for food even when submitted', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  await agent.post('/menu').type('form').send({
+    name: 'Test Scone', category: 'Bakery', price: '2.75', itemType: 'food', priceMedium: '3.25', priceLarge: '3.75',
+  });
+  const row = await db.query("SELECT price_medium, price_large FROM menu_items WHERE shop_id = $1 AND name = 'Test Scone'", [shopId]);
+  assert.deepEqual(row.rows[0], { price_medium: null, price_large: null });
+});
