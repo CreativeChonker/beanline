@@ -157,3 +157,66 @@ test('the menu editor uses plain language instead of "86 it"', async () => {
   assert.doesNotMatch(res.text, /86 it/);
   assert.match(res.text, /Mark unavailable/);
 });
+
+test('POST /menu with a photo stores it in object storage and saves the URL', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  const res = await agent.post('/menu')
+    .field('name', 'Photo Latte').field('category', 'Coffee').field('price', '4.50').field('itemType', 'drink')
+    .attach('itemImage', Buffer.from('fake jpeg bytes'), { filename: 'latte.jpg', contentType: 'image/jpeg' });
+  assert.equal(res.status, 302);
+
+  const row = await db.query("SELECT image_url FROM menu_items WHERE shop_id = $1 AND name = 'Photo Latte'", [shopId]);
+  assert.match(row.rows[0].image_url, /^http/);
+  const imageRes = await fetch(row.rows[0].image_url);
+  assert.equal(imageRes.status, 200);
+});
+
+test('POST /menu with a non-image file re-renders with the form values preserved and creates nothing', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  const res = await agent.post('/menu')
+    .field('name', 'Photo Latte').field('category', 'Coffee').field('price', '4.50').field('itemType', 'drink')
+    .attach('itemImage', Buffer.from('not an image'), { filename: 'notes.txt', contentType: 'text/plain' });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /JPG, PNG, or WEBP/);
+  assert.match(res.text, /value="Photo Latte"/);
+
+  const row = await db.query("SELECT COUNT(*)::int AS n FROM menu_items WHERE shop_id = $1 AND name = 'Photo Latte'", [shopId]);
+  assert.equal(row.rows[0].n, 0);
+});
+
+test('POST /menu/:id with a bad file keeps the existing photo and the item unchanged', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  await agent.post('/menu')
+    .field('name', 'Photo Mocha').field('category', 'Coffee').field('price', '5.00').field('itemType', 'drink')
+    .attach('itemImage', Buffer.from('fake jpeg bytes'), { filename: 'mocha.jpg', contentType: 'image/jpeg' });
+  const before = await db.query("SELECT id, image_url FROM menu_items WHERE shop_id = $1 AND name = 'Photo Mocha'", [shopId]);
+
+  const res = await agent.post(`/menu/${before.rows[0].id}`)
+    .field('name', 'Photo Mocha').field('category', 'Coffee').field('price', '5.25').field('itemType', 'drink')
+    .attach('itemImage', Buffer.from('nope'), { filename: 'x.gif', contentType: 'image/gif' });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /JPG, PNG, or WEBP/);
+
+  const after = await db.query("SELECT image_url, price::float8 AS price FROM menu_items WHERE id = $1", [before.rows[0].id]);
+  assert.equal(after.rows[0].image_url, before.rows[0].image_url);
+  assert.equal(after.rows[0].price, 5.0);
+});
+
+test('POST /menu/:id with a new photo replaces the old URL', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  await agent.post('/menu')
+    .field('name', 'Photo Flat').field('category', 'Coffee').field('price', '4.00').field('itemType', 'drink')
+    .attach('itemImage', Buffer.from('v1'), { filename: 'a.png', contentType: 'image/png' });
+  const before = await db.query("SELECT id, image_url FROM menu_items WHERE shop_id = $1 AND name = 'Photo Flat'", [shopId]);
+
+  await agent.post(`/menu/${before.rows[0].id}`)
+    .field('name', 'Photo Flat').field('category', 'Coffee').field('price', '4.00').field('itemType', 'drink')
+    .attach('itemImage', Buffer.from('v2'), { filename: 'b.png', contentType: 'image/png' });
+  const after = await db.query("SELECT image_url FROM menu_items WHERE id = $1", [before.rows[0].id]);
+  assert.notEqual(after.rows[0].image_url, before.rows[0].image_url);
+  assert.match(after.rows[0].image_url, /^http/);
+});

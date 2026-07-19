@@ -306,37 +306,65 @@ app.post('/pos/layout', requireAuth, requireRole('owner'), async (req, res, next
 
 // --- Owner menu editor ---
 
+const ITEM_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+async function uploadItemImage(shopId, itemId, file) {
+  const ext = file.mimetype.split('/')[1];
+  const key = `shops/${shopId}/items/${itemId}-${Date.now()}.${ext}`;
+  return storage.uploadImage(file.buffer, key, file.mimetype);
+}
+
 app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
   try {
     const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId);
-    res.render('menu-edit', { items, error: null });
+    res.render('menu-edit', { items, error: null, values: {} });
   } catch (err) {
     next(err);
   }
 });
 
-app.post('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
-  const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
-  const parsedPrice = parseFloat(price);
-  const type = itemType === 'food' ? 'food' : 'drink';
-  const parseSize = (v) => {
-    if (v === undefined || v === '') return null;
-    const n = parseFloat(v);
-    return Number.isNaN(n) || n <= 0 ? undefined : n;
-  };
-  const parsedMedium = parseSize(priceMedium);
-  const parsedLarge = parseSize(priceLarge);
-  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
-      || parsedMedium === undefined || parsedLarge === undefined) {
-    const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId);
-    return res.render('menu-edit', { items, error: 'Please provide a name, category, and a valid price.' });
-  }
-  try {
-    await menuItems.createMenuItem(db, { shopId: req.session.user.shopId, name, category, price: parsedPrice, note: note || '', itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge });
-    res.redirect('/menu');
-  } catch (err) {
-    next(err);
-  }
+app.post('/menu', requireAuth, requireRole('owner'), (req, res, next) => {
+  upload.single('itemImage')(req, res, async (uploadErr) => {
+    const shopId = req.session.user.shopId;
+    const rerender = async (error, values) => {
+      const items = await menuItems.getMenuItemsForShop(db, shopId);
+      res.render('menu-edit', { items, error, values: values || {} });
+    };
+    try {
+      if (uploadErr) {
+        const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';
+        return rerender(message, req.body);
+      }
+      const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
+      const parsedPrice = parseFloat(price);
+      const type = itemType === 'food' ? 'food' : 'drink';
+      const parseSize = (v) => {
+        if (v === undefined || v === '') return null;
+        const n = parseFloat(v);
+        return Number.isNaN(n) || n <= 0 ? undefined : n;
+      };
+      const parsedMedium = parseSize(priceMedium);
+      const parsedLarge = parseSize(priceLarge);
+      if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
+          || parsedMedium === undefined || parsedLarge === undefined) {
+        return rerender('Please provide a name, category, and a valid price.', req.body);
+      }
+      if (req.file && !ITEM_IMAGE_TYPES.includes(req.file.mimetype)) {
+        return rerender('Please upload a JPG, PNG, or WEBP image.', req.body);
+      }
+      const item = await menuItems.createMenuItem(db, {
+        shopId, name, category, price: parsedPrice, note: note || '',
+        itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge,
+      });
+      if (req.file) {
+        const url = await uploadItemImage(shopId, item.id, req.file);
+        await menuItems.setItemImage(db, shopId, item.id, url);
+      }
+      res.redirect('/menu');
+    } catch (err) {
+      next(err);
+    }
+  });
 });
 
 app.get('/menu/:id/edit', requireAuth, requireRole('owner'), async (req, res, next) => {
@@ -349,30 +377,47 @@ app.get('/menu/:id/edit', requireAuth, requireRole('owner'), async (req, res, ne
   }
 });
 
-app.post('/menu/:id', requireAuth, requireRole('owner'), async (req, res, next) => {
-  const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
-  const parsedPrice = parseFloat(price);
-  const type = itemType === 'food' ? 'food' : 'drink';
-  const parseSize = (v) => {
-    if (v === undefined || v === '') return null;
-    const n = parseFloat(v);
-    return Number.isNaN(n) || n <= 0 ? undefined : n;
-  };
-  const parsedMedium = parseSize(priceMedium);
-  const parsedLarge = parseSize(priceLarge);
-  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
-      || parsedMedium === undefined || parsedLarge === undefined) {
-    const item = await menuItems.getMenuItemById(db, req.session.user.shopId, req.params.id);
-    if (!item) return res.status(404).send('Item not found.');
-    return res.render('menu-item-edit', { item, error: 'Please provide a name, category, and a valid price.' });
-  }
-  try {
-    const updated = await menuItems.updateMenuItem(db, req.session.user.shopId, req.params.id, { name, category, price: parsedPrice, note: note || '', itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge });
-    if (!updated) return res.status(404).send('Item not found.');
-    res.redirect('/menu');
-  } catch (err) {
-    next(err);
-  }
+app.post('/menu/:id', requireAuth, requireRole('owner'), (req, res, next) => {
+  upload.single('itemImage')(req, res, async (uploadErr) => {
+    const shopId = req.session.user.shopId;
+    try {
+      const rerender = async (error) => {
+        const item = await menuItems.getMenuItemById(db, shopId, req.params.id);
+        if (!item) return res.status(404).send('Item not found.');
+        return res.render('menu-item-edit', { item, error });
+      };
+      if (uploadErr) {
+        const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';
+        return await rerender(message);
+      }
+      const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
+      const parsedPrice = parseFloat(price);
+      const type = itemType === 'food' ? 'food' : 'drink';
+      const parseSize = (v) => {
+        if (v === undefined || v === '') return null;
+        const n = parseFloat(v);
+        return Number.isNaN(n) || n <= 0 ? undefined : n;
+      };
+      const parsedMedium = parseSize(priceMedium);
+      const parsedLarge = parseSize(priceLarge);
+      if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
+          || parsedMedium === undefined || parsedLarge === undefined) {
+        return await rerender('Please provide a name, category, and a valid price.');
+      }
+      if (req.file && !ITEM_IMAGE_TYPES.includes(req.file.mimetype)) {
+        return await rerender('Please upload a JPG, PNG, or WEBP image.');
+      }
+      const updated = await menuItems.updateMenuItem(db, shopId, req.params.id, { name, category, price: parsedPrice, note: note || '', itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge });
+      if (!updated) return res.status(404).send('Item not found.');
+      if (req.file) {
+        const url = await uploadItemImage(shopId, req.params.id, req.file);
+        await menuItems.setItemImage(db, shopId, req.params.id, url);
+      }
+      res.redirect('/menu');
+    } catch (err) {
+      next(err);
+    }
+  });
 });
 
 app.post('/menu/:id/toggle', requireAuth, requireRole('owner'), async (req, res, next) => {
