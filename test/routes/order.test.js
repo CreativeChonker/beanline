@@ -99,3 +99,14 @@ test('POST /:shopSlug/order with no items selected re-renders with an error', as
   assert.equal(res.status, 200);
   assert.match(res.text, /select at least one item/);
 });
+
+test('GET /:shopSlug/order shows item photos on cards and placeholders without one', async () => {
+  const app = require('../../server');
+  const shop = await createShopWithMenu(app);
+  await db.query("UPDATE menu_items SET image_url = 'http://img.test/latte.jpg' WHERE shop_id = $1 AND name = 'Latte'", [shop.id]);
+  const agent = await loggedInCustomer(app);
+  const res = await agent.get('/blue-bottle/order');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /class="menu-card-photo"[\s\S]*?src="http:\/\/img.test\/latte.jpg"/);
+  assert.match(res.text, /menu-card-photo placeholder/);
+});
