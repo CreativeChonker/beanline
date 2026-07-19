@@ -73,15 +73,24 @@
     .menu-layout { flex-direction: column; }
     .menu-side { width: 100%; position: static; max-height: none; }
   }
-  .upload-box {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    border: 1.5px dashed var(--line); border-radius: 9px; background: var(--parchment); cursor: pointer;
-    color: var(--ink-soft); font-size: 12.5px;
+  .upload-square {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: 170px; aspect-ratio: 1; margin: 0 auto; overflow: hidden;
+    border: 1.5px dashed var(--line); border-radius: 12px; background: var(--parchment);
+    cursor: pointer; color: var(--ink-soft); text-align: center;
   }
-  .upload-box:hover { border-color: var(--gold); color: var(--gold-deep); }
-  .upload-box svg { width: 18px; height: 18px; flex-shrink: 0; }
-  .upload-box input { display: none; }
-  .upload-box .upload-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-square:hover { border-color: var(--gold); color: var(--gold-deep); }
+  .upload-square img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .upload-square input { display: none; }
+  .upload-hint { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; padding: 10px; }
+  .upload-hint svg { width: 24px; height: 24px; }
+  .upload-hint .upload-name { font-weight: 600; font-size: 12.5px; }
+  .add-item-form textarea {
+    width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink); font-family: var(--font-body); font-size: 14.5px;
+    resize: vertical; min-height: 76px;
+  }
+  .add-item-form textarea:focus { border-color: var(--gold); }
   @media (max-width: 900px) { .add-item-form { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
@@ -107,6 +116,7 @@
           const categories = [...new Set(items.map((i) => i.category))];
           const catIcon = (cat) => {
             const c = cat.toLowerCase();
+            if (/cake|dessert|torte/.test(c)) return 'cake';
             if (/bak|food|pastr|snack|bread|sandwich/.test(c)) return 'pastry';
             if (/tea|matcha/.test(c)) return 'leaf';
             return 'cup';
@@ -116,7 +126,9 @@
           <% const catItems = items.filter((i) => i.category === cat); %>
           <div class="menu-section">
             <button type="button" class="menu-section-toggle">
-              <% if (catIcon(cat) === 'pastry') { %>
+              <% if (catIcon(cat) === 'cake') { %>
+                <svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M4 21v-4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/><path d="M6.5 15v-2.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2V15"/><path d="M12 10.5V8.5"/><path d="M12 5.5c.7.8.7 1.7 0 2.5-.7-.8-.7-1.7 0-2.5z"/></svg>
+              <% } else if (catIcon(cat) === 'pastry') { %>
                 <svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4c-5 0-9 5.5-9 9a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3c0-3.5-4-9-9-9z"/><path d="M8.5 9.5c1-1.5 2.2-2.3 3.5-2.3s2.5.8 3.5 2.3"/></svg>
               <% } else if (catIcon(cat) === 'leaf') { %>
                 <svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 4 13c0-5 4-9 9-9a7 7 0 0 1 7 7c0 5-4 9-9 9z"/><path d="M4 21c4-4 7-6 12-8"/></svg>
@@ -198,6 +210,17 @@
         <% const cats = [...new Set(items.map((i) => i.category))]; %>
         <% const isNewCat = values.category && !cats.includes(values.category); %>
         <form method="POST" action="/menu" class="add-item-form" enctype="multipart/form-data">
+          <div class="field span-2"><label>Image</label>
+            <label class="upload-square">
+              <img id="upload-preview" alt="" hidden>
+              <span class="upload-hint" id="upload-hint">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.6-4.6a1.5 1.5 0 0 0-2.1 0L5 20"/></svg>
+                <span class="upload-name">Upload Image</span>
+                <span>JPG, PNG or WEBP up to 5MB</span>
+              </span>
+              <input id="itemImage" name="itemImage" type="file" accept="image/jpeg,image/png,image/webp">
+            </label>
+          </div>
           <div class="field span-2"><label for="name">Name</label><input id="name" name="name" type="text" required placeholder="Enter item name" value="<%= values.name || '' %>"></div>
           <div class="field"><label for="categorySelect">Category</label>
             <select id="categorySelect" name="category">
@@ -212,14 +235,7 @@
           <div class="field"><label for="price" id="price-label">Price (S / Base)</label><input id="price" name="price" type="number" step="0.01" min="0.01" required placeholder="0.00" value="<%= values.price || '' %>"></div>
           <div class="field" id="field-medium"><label for="priceMedium" id="medium-label">Price M</label><input id="priceMedium" name="priceMedium" type="number" step="0.01" min="0.01" placeholder="0.00" value="<%= values.priceMedium || '' %>"></div>
           <div class="field" id="field-large"><label for="priceLarge">Price L</label><input id="priceLarge" name="priceLarge" type="number" step="0.01" min="0.01" placeholder="0.00" value="<%= values.priceLarge || '' %>"></div>
-          <div class="field span-2"><label for="note">Note</label><input id="note" name="note" type="text" placeholder="Add a note (ingredients, description, etc.)" value="<%= values.note || '' %>"></div>
-          <div class="field span-2"><label>Image</label>
-            <label class="upload-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.6-4.6a1.5 1.5 0 0 0-2.1 0L5 20"/></svg>
-              <span><span class="upload-name" id="upload-name">Upload Image</span><br>JPG, PNG or WEBP up to 5MB</span>
-              <input id="itemImage" name="itemImage" type="file" accept="image/jpeg,image/png,image/webp">
-            </label>
-          </div>
+          <div class="field span-2"><label for="note">Description</label><textarea id="note" name="note" rows="3" placeholder="Add a description (ingredients, details, etc.)"><%= values.note || '' %></textarea></div>
           <button type="submit" class="btn btn-primary span-2" style="margin:0;">Add Item</button>
         </form>
       </div>
@@ -265,7 +281,12 @@
 
     const fileInput = document.getElementById('itemImage');
     if (fileInput) fileInput.addEventListener('change', () => {
-      document.getElementById('upload-name').textContent = fileInput.files[0] ? fileInput.files[0].name : 'Upload Image';
+      const file = fileInput.files[0];
+      const preview = document.getElementById('upload-preview');
+      const hint = document.getElementById('upload-hint');
+      if (preview.src) URL.revokeObjectURL(preview.src);
+      if (file) { preview.src = URL.createObjectURL(file); preview.hidden = false; hint.style.display = 'none'; }
+      else { preview.removeAttribute('src'); preview.hidden = true; hint.style.display = ''; }
     });
   </script>
 </body>

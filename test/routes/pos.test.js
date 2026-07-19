@@ -195,13 +195,13 @@ test('GET /pos renders category sections and hides pickers the shop disabled', a
   assert.match(res.text, /data-picker="size"/);
 });
 
-test('GET /pos shows item photos on cards and placeholders without one', async () => {
+test('GET /pos keeps cards text-only even when items have photos', async () => {
   const app = require('../../server');
   const { agent, shopId } = await ownerAgentWithShop(app);
   await db.query("UPDATE menu_items SET image_url = 'http://img.test/latte.jpg' WHERE shop_id = $1 AND name = 'Latte'", [shopId]);
   const res = await agent.get('/pos');
-  assert.match(res.text, /class="menu-card-photo"[\s\S]*?src="http:\/\/img.test\/latte.jpg"/);
-  assert.match(res.text, /menu-card-photo placeholder/);
+  assert.doesNotMatch(res.text, /menu-card-photo/);
+  assert.doesNotMatch(res.text, /img.test\/latte.jpg/);
 });
 
 test('POST /pos rings up a cake by the slice and whole with server-side pricing', async () => {
