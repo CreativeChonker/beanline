@@ -202,14 +202,16 @@ app.post('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlu
       created_at: created.created_at,
     };
 
-    try {
-      await fetch(process.env.N8N_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(order),
-      });
-    } catch (err) {
-      console.error('Failed to notify n8n webhook:', err.message);
+    if (process.env.N8N_WEBHOOK_URL) {
+      try {
+        await fetch(process.env.N8N_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order),
+        });
+      } catch (err) {
+        console.error('Failed to notify n8n webhook:', err.message);
+      }
     }
 
     res.render('confirmation', { order, shop: req.shop });
