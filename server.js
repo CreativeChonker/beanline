@@ -226,8 +226,11 @@ app.post('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlu
 
 app.get('/dashboard', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
   try {
-    const shopOrders = await orders.getOrdersForShop(db, req.session.user.shopId);
-    res.render('dashboard', { orders: shopOrders, formatLine: posLines.formatLineDetails });
+    const [shopOrders, shop] = await Promise.all([
+      orders.getOrdersForShop(db, req.session.user.shopId),
+      shops.getShopById(db, req.session.user.shopId),
+    ]);
+    res.render('dashboard', { orders: shopOrders, shop, formatLine: posLines.formatLineDetails });
   } catch (err) {
     next(err);
   }
@@ -316,8 +319,11 @@ async function uploadItemImage(shopId, itemId, file) {
 
 app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
   try {
-    const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId);
-    res.render('menu-edit', { items, error: null, values: {} });
+    const [items, shop] = await Promise.all([
+      menuItems.getMenuItemsForShop(db, req.session.user.shopId),
+      shops.getShopById(db, req.session.user.shopId),
+    ]);
+    res.render('menu-edit', { items, shop, error: null, values: {} });
   } catch (err) {
     next(err);
   }
@@ -327,8 +333,11 @@ app.post('/menu', requireAuth, requireRole('owner'), (req, res, next) => {
   upload.single('itemImage')(req, res, async (uploadErr) => {
     const shopId = req.session.user.shopId;
     const rerender = async (error, values) => {
-      const items = await menuItems.getMenuItemsForShop(db, shopId);
-      res.render('menu-edit', { items, error, values: values || {} });
+      const [items, shop] = await Promise.all([
+        menuItems.getMenuItemsForShop(db, shopId),
+        shops.getShopById(db, shopId),
+      ]);
+      res.render('menu-edit', { items, shop, error, values: values || {} });
     };
     try {
       if (uploadErr) {
@@ -369,9 +378,12 @@ app.post('/menu', requireAuth, requireRole('owner'), (req, res, next) => {
 
 app.get('/menu/:id/edit', requireAuth, requireRole('owner'), async (req, res, next) => {
   try {
-    const item = await menuItems.getMenuItemById(db, req.session.user.shopId, req.params.id);
+    const [item, shop] = await Promise.all([
+      menuItems.getMenuItemById(db, req.session.user.shopId, req.params.id),
+      shops.getShopById(db, req.session.user.shopId),
+    ]);
     if (!item) return res.status(404).send('Item not found.');
-    res.render('menu-item-edit', { item, error: null });
+    res.render('menu-item-edit', { item, shop, error: null });
   } catch (err) {
     next(err);
   }
@@ -382,9 +394,12 @@ app.post('/menu/:id', requireAuth, requireRole('owner'), (req, res, next) => {
     const shopId = req.session.user.shopId;
     try {
       const rerender = async (error) => {
-        const item = await menuItems.getMenuItemById(db, shopId, req.params.id);
+        const [item, shop] = await Promise.all([
+          menuItems.getMenuItemById(db, shopId, req.params.id),
+          shops.getShopById(db, shopId),
+        ]);
         if (!item) return res.status(404).send('Item not found.');
-        return res.render('menu-item-edit', { item, error });
+        return res.render('menu-item-edit', { item, shop, error });
       };
       if (uploadErr) {
         const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';

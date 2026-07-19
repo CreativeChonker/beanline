@@ -1,0 +1,34 @@
+<% const roleLabel = { owner: 'Owner', staff: 'Staff', customer: 'Customer' }[user.role] || user.role; %>
+<div class="app-sidebar">
+  <div class="app-mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/><path d="M8 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2M12.5 2.5c0 1-1 1.2-1 2.2s1 1.2 1 2.2"/></svg>
+    <div>
+      <span>Beanline</span>
+      <div class="app-shop-name"><%= shop.name %></div>
+    </div>
+  </div>
+  <a class="app-nav-item <%= active === 'orders' ? 'active' : '' %>" href="/dashboard">
+    <svg class="app-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h2"/><rect x="9" y="2.5" width="6" height="3.5" rx="1"/><path d="M9 11h6M9 15h4"/></svg>
+    Orders</a>
+  <a class="app-nav-item <%= active === 'menu' ? 'active' : '' %>" href="/menu">
+    <svg class="app-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+    Menu</a>
+  <a class="app-nav-item <%= active === 'pos' ? 'active' : '' %>" href="/pos">
+    <svg class="app-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 21h10M12 17v4"/></svg>
+    POS</a>
+  <a class="app-nav-item <%= active === 'settings' ? 'active' : '' %>" href="/shop/settings">
+    <svg class="app-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings</a>
+  <div class="app-sidebar-foot">
+    <div class="app-foot-user">
+      <div class="app-avatar"><%= user.name.charAt(0).toUpperCase() %></div>
+      <div>
+        <div class="who"><%= roleLabel %> · <%= user.name %></div>
+        <div class="app-foot-role"><%= user.role === 'owner' ? 'Administrator' : roleLabel %></div>
+      </div>
+    </div>
+    <a class="app-logout" href="/logout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
+      Log out</a>
+  </div>
+</div>
