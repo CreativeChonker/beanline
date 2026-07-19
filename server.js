@@ -285,9 +285,12 @@ app.post('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, ne
 
 app.post('/pos/layout', requireAuth, requireRole('owner'), async (req, res, next) => {
   const { categoryOrder, items } = req.body;
+  const isValidCategory = (c) => typeof c === 'string' && c.length > 0 && c.length <= 100;
   if (!Array.isArray(categoryOrder) || !Array.isArray(items)
-      || !categoryOrder.every((c) => typeof c === 'string')
-      || !items.every((i) => i && Number.isInteger(Number(i.id)) && typeof i.category === 'string' && Number.isInteger(Number(i.sortOrder)))) {
+      || categoryOrder.length > 100 || items.length > 500
+      || !categoryOrder.every(isValidCategory)
+      || !items.every((i) => i && Number.isInteger(Number(i.id)) && isValidCategory(i.category)
+        && Number.isInteger(Number(i.sortOrder)) && Number(i.sortOrder) >= 0 && Number(i.sortOrder) <= 100000)) {
     return res.status(400).send('Invalid layout.');
   }
   try {

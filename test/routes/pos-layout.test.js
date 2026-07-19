@@ -72,3 +72,17 @@ test('rejects malformed layout payloads', async () => {
   const res = await agent.post('/pos/layout').send({ categoryOrder: 'nope', items: 'nope' });
   assert.equal(res.status, 400);
 });
+
+test('rejects a layout with an out-of-range sortOrder', async () => {
+  const app = require('../../server');
+  const agent = await ownerAgent(app);
+  const shop = await db.query('SELECT id FROM shops WHERE slug = $1', ['blue-bottle']);
+  const shopId = shop.rows[0].id;
+  const a = await menuItems.createMenuItem(db, { shopId, name: 'Latte', price: 4.5, category: 'Coffee' });
+
+  const res = await agent.post('/pos/layout').send({
+    categoryOrder: ['Coffee'],
+    items: [{ id: a.id, category: 'Coffee', sortOrder: 1e15 }],
+  });
+  assert.equal(res.status, 400);
+});

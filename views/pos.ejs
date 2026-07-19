@@ -3,13 +3,6 @@
 <html>
 <head><title>POS · Beanline</title><%- include('partials-head') %>
 <style>
-  .categories { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
-  .category-pill {
-    padding: 7px 15px; border-radius: 999px; background: #fff; border: 1px solid var(--line);
-    font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  }
-  .category-pill.active { background: var(--espresso); color: var(--gold); border-color: var(--espresso); }
   .content { display: flex; gap: 24px; align-items: flex-start; }
   .menu-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
   .menu-card {
@@ -316,6 +309,8 @@
       return parts.join(' · ');
     }
 
+    function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
     function renderBill() {
       const billList = document.getElementById('bill-list');
       if (cart.length === 0) {
@@ -332,8 +327,8 @@
         count += l.qty;
         const details = detailText(l);
         return '<div class="receipt-line bill-item">'
-          + '<span class="qty-name">' + l.name + ' &times;' + l.qty
-          + (details ? '<span class="line-details">' + details.replace(/</g, '&lt;') + '</span>' : '')
+          + '<span class="qty-name">' + esc(l.name) + ' &times;' + l.qty
+          + (details ? '<span class="line-details">' + esc(details) + '</span>' : '')
           + '</span><span class="dots"></span>'
           + '<span>$' + (l.price * l.qty).toFixed(2) + '</span>'
           + '<button type="button" class="remove" onclick="removeLine(' + i + ')">remove</button></div>';
@@ -396,7 +391,9 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ categoryOrder, items }),
-        });
+        })
+          .then((res) => { if (!res.ok) throw new Error('save failed'); })
+          .catch(() => alert('Could not save the layout — please try again.'));
       }
     }
   </script>

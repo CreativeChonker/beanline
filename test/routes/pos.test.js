@@ -172,6 +172,19 @@ test("POST /pos still cannot ring up another shop's item id", async () => {
   assert.match(res.text, /no longer available/i);
 });
 
+test('GET /pos escapes item names in server-rendered card markup', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  await menuItems.createMenuItem(db, {
+    shopId, name: 'S\'mores <3 & "Latte"', price: 5, category: 'Coffee',
+  });
+  const res = await agent.get('/pos');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /S&#39;mores/);
+  assert.match(res.text, /&lt;3/);
+  assert.doesNotMatch(res.text, /<img/);
+});
+
 test('GET /pos renders category sections and hides pickers the shop disabled', async () => {
   const app = require('../../server');
   const { agent, shopId } = await staffAgentWithMenu(app);
