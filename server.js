@@ -7,6 +7,7 @@ const shops = require('./models/shops');
 const users = require('./models/users');
 const orders = require('./models/orders');
 const menuItems = require('./models/menuItems');
+const categories = require('./models/categories');
 const seedMenu = require('./db/seed-menu');
 const { requireAuth, requireRole, loadShopBySlug } = require('./middleware/auth');
 const multer = require('multer');
@@ -59,8 +60,14 @@ app.post('/shops/new', async (req, res, next) => {
     const result = await db.withTransaction(async (client) => {
       const shop = await shops.createShop(client, { name: shopName, slug });
       const owner = await users.createOwner(client, { name: ownerName, email, password, shopId: shop.id });
-      for (const item of seedMenu) {
-        await menuItems.createMenuItem(client, { shopId: shop.id, ...item });
+      const catIds = {};
+      for (const cat of seedMenu.categories) {
+        const created = await categories.createCategory(client, { shopId: shop.id, ...cat });
+        catIds[cat.name] = created.id;
+      }
+      for (const item of seedMenu.items) {
+        const { category, ...fields } = item;
+        await menuItems.createMenuItem(client, { shopId: shop.id, categoryId: catIds[category], ...fields });
       }
       return { shop, owner };
     });
@@ -239,11 +246,12 @@ app.get('/dashboard', requireAuth, requireRole('owner', 'staff'), async (req, re
 
 app.get('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
   try {
-    const [items, shop] = await Promise.all([
+    const [items, cats, shop] = await Promise.all([
       menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true }),
+      categories.getCategoriesForShop(db, req.session.user.shopId, { includeArchived: false }),
       shops.getShopById(db, req.session.user.shopId),
     ]);
-    res.render('pos', { menu: items, shop, error: null, formatLine: posLines.formatLineDetails });
+    res.render('pos', { menu: items, categories: cats, shop, error: null, formatLine: posLines.formatLineDetails });
   } catch (err) {
     next(err);
   }
@@ -252,11 +260,12 @@ app.get('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, nex
 app.post('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
   const { paymentMethod } = req.body;
   try {
-    const [availableItems, shop] = await Promise.all([
+    const [availableItems, cats, shop] = await Promise.all([
       menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true }),
+      categories.getCategoriesForShop(db, req.session.user.shopId, { includeArchived: false }),
       shops.getShopById(db, req.session.user.shopId),
     ]);
-    const rerender = (error) => res.render('pos', { menu: availableItems, shop, error, formatLine: posLines.formatLineDetails });
+    const rerender = (error) => res.render('pos', { menu: availableItems, categories: cats, shop, error, formatLine: posLines.formatLineDetails });
 
     const parsed = posLines.parseAndPriceLines(req.body.lines || '', availableItems);
     if (parsed.error) return rerender(parsed.error);
@@ -289,19 +298,19 @@ app.post('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, ne
 
 app.post('/pos/layout', requireAuth, requireRole('owner'), async (req, res, next) => {
   const { categoryOrder, items } = req.body;
-  const isValidCategory = (c) => typeof c === 'string' && c.length > 0 && c.length <= 100;
+  const isId = (v) => Number.isInteger(Number(v)) && Number(v) > 0;
   if (!Array.isArray(categoryOrder) || !Array.isArray(items)
-      || categoryOrder.length > 100 || items.length > 500
-      || !categoryOrder.every(isValidCategory)
-      || !items.every((i) => i && Number.isInteger(Number(i.id)) && isValidCategory(i.category)
+      || categoryOrder.length > 500 || items.length > 500
+      || !categoryOrder.every(isId)
+      || !items.every((i) => i && isId(i.id) && isId(i.categoryId)
         && Number.isInteger(Number(i.sortOrder)) && Number(i.sortOrder) >= 0 && Number(i.sortOrder) <= 100000)) {
     return res.status(400).send('Invalid layout.');
   }
   try {
     await menuItems.updateLayout(db, req.session.user.shopId, items.map((i) => ({
-      id: Number(i.id), category: i.category, sortOrder: Number(i.sortOrder),
+      id: Number(i.id), categoryId: Number(i.categoryId), sortOrder: Number(i.sortOrder),
     })));
-    await shops.updateCategoryOrder(db, req.session.user.shopId, categoryOrder);
+    await categories.updateDisplayOrder(db, req.session.user.shopId, categoryOrder.map(Number));
     res.status(204).end();
   } catch (err) {
     next(err);
@@ -318,43 +327,125 @@ async function uploadItemImage(shopId, itemId, file) {
   return storage.uploadImage(file.buffer, key, file.mimetype);
 }
 
-function parseMenuItemForm(body, file) {
-  const { name, category, price, note, itemType, priceMedium, priceLarge } = body;
-  const parsedPrice = parseFloat(price);
-  const parseSize = (v) => {
+// Resolves the target category (creating one when categoryNew is given) and
+// validates one price per tier of that category. Tier 1 is required; later
+// tiers are optional (rendered as a dash when unset).
+async function parseMenuItemForm(shopId, body, file) {
+  const { name, categoryId, categoryNew, price, note, priceMedium, priceLarge } = body;
+  const parseTier = (v) => {
     if (v === undefined || v === '') return null;
     const n = parseFloat(v);
     return Number.isNaN(n) || n <= 0 ? undefined : n;
   };
-  const parsedMedium = parseSize(priceMedium);
-  const parsedLarge = parseSize(priceLarge);
-  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
-      || parsedMedium === undefined || parsedLarge === undefined) {
+  const parsed = [parseTier(price), parseTier(priceMedium), parseTier(priceLarge)];
+  if (!name || parsed[0] === null || parsed.some((p) => p === undefined)) {
     return { error: 'Please provide a name, category, and a valid price.' };
   }
   if (file && !ITEM_IMAGE_TYPES.includes(file.mimetype)) {
     return { error: 'Please upload a JPG, PNG, or WEBP image.' };
   }
-  const type = ['food', 'cake'].includes(itemType) ? itemType : 'drink';
+
+  let category;
+  if (categoryNew !== undefined && categoryNew !== '') {
+    const catName = String(categoryNew).trim();
+    if (!catName || catName.length > 50) return { error: 'Category names must be 1–50 characters.' };
+    try {
+      category = await categories.createCategory(db, { shopId, name: catName });
+    } catch (err) {
+      if (err.code === '23505') return { error: 'A category with that name already exists.' };
+      throw err;
+    }
+  } else {
+    category = await categories.getCategoryById(db, shopId, Number(categoryId));
+    if (!category) return { error: 'Please choose a category.' };
+  }
+
+  const tiers = category.tier_names;
   return {
     fields: {
-      name, category, note: note || '',
-      price: parsedPrice,
-      itemType: type,
-      // food has one price; cakes price by slice (base) + whole (medium slot), never large
-      priceMedium: type === 'food' ? null : parsedMedium,
-      priceLarge: type === 'drink' ? parsedLarge : null,
+      name, categoryId: category.id, note: note || '',
+      price: parsed[0],
+      priceMedium: tiers.length > 1 ? parsed[1] : null,
+      priceLarge: tiers.length > 2 ? parsed[2] : null,
     },
   };
 }
 
+// Owner category management: parse and validate the shared category form.
+function parseCategoryForm(body) {
+  const name = String(body.name || '').trim();
+  if (!name || name.length > 50) return { error: 'Category names must be 1–50 characters.' };
+  const tierNames = String(body.tierNames || 'Price').split(',').map((t) => t.trim()).filter(Boolean);
+  if (tierNames.length < 1 || tierNames.length > 3 || tierNames.some((t) => t.length > 20)) {
+    return { error: 'Categories need 1–3 price tiers, each named up to 20 characters.' };
+  }
+  return {
+    fields: {
+      name, tierNames,
+      drinkOptions: body.drinkOptions === 'on',
+      showWhenEmpty: body.showWhenEmpty === 'on',
+      archived: body.archived === 'on',
+    },
+  };
+}
+
+async function renderMenuEditor(res, shopId, error, values) {
+  const [items, cats, shop] = await Promise.all([
+    menuItems.getMenuItemsForShop(db, shopId),
+    categories.getCategoriesForShop(db, shopId),
+    shops.getShopById(db, shopId),
+  ]);
+  res.render('menu-edit', { items, categories: cats, shop, error, values: values || {} });
+}
+
 app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
   try {
-    const [items, shop] = await Promise.all([
-      menuItems.getMenuItemsForShop(db, req.session.user.shopId),
-      shops.getShopById(db, req.session.user.shopId),
-    ]);
-    res.render('menu-edit', { items, shop, error: null, values: {} });
+    await renderMenuEditor(res, req.session.user.shopId, null);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Owner category management ---
+
+app.post('/categories', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const parsed = parseCategoryForm(req.body);
+    if (parsed.error) return await renderMenuEditor(res, req.session.user.shopId, parsed.error);
+    const { archived, ...fields } = parsed.fields;
+    await categories.createCategory(db, { shopId: req.session.user.shopId, ...fields });
+    res.redirect('/menu');
+  } catch (err) {
+    if (err.code === '23505') return renderMenuEditor(res, req.session.user.shopId, 'A category with that name already exists.').catch(next);
+    next(err);
+  }
+});
+
+app.post('/categories/:id', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const shopId = req.session.user.shopId;
+    const existing = await categories.getCategoryById(db, shopId, req.params.id);
+    if (!existing) return res.status(404).send('Category not found.');
+    const parsed = parseCategoryForm(req.body);
+    if (parsed.error) return await renderMenuEditor(res, shopId, parsed.error);
+    const displayOrder = Number.isInteger(Number(req.body.displayOrder))
+      ? Number(req.body.displayOrder) : existing.display_order;
+    await categories.updateCategory(db, shopId, existing.id, { ...parsed.fields, displayOrder });
+    res.redirect('/menu');
+  } catch (err) {
+    if (err.code === '23505') return renderMenuEditor(res, req.session.user.shopId, 'A category with that name already exists.').catch(next);
+    next(err);
+  }
+});
+
+app.post('/categories/:id/delete', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const shopId = req.session.user.shopId;
+    const existing = await categories.getCategoryById(db, shopId, req.params.id);
+    if (!existing) return res.status(404).send('Category not found.');
+    const deleted = await categories.deleteCategory(db, shopId, existing.id);
+    if (!deleted) return await renderMenuEditor(res, shopId, 'Move or delete the items in that category first.');
+    res.redirect('/menu');
   } catch (err) {
     next(err);
   }
@@ -363,19 +454,13 @@ app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
 app.post('/menu', requireAuth, requireRole('owner'), (req, res, next) => {
   upload.single('itemImage')(req, res, async (uploadErr) => {
     const shopId = req.session.user.shopId;
-    const rerender = async (error, values) => {
-      const [items, shop] = await Promise.all([
-        menuItems.getMenuItemsForShop(db, shopId),
-        shops.getShopById(db, shopId),
-      ]);
-      res.render('menu-edit', { items, shop, error, values: values || {} });
-    };
+    const rerender = (error, values) => renderMenuEditor(res, shopId, error, values);
     try {
       if (uploadErr) {
         const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';
         return await rerender(message, req.body);
       }
-      const parsed = parseMenuItemForm(req.body, req.file);
+      const parsed = await parseMenuItemForm(shopId, req.body, req.file);
       if (parsed.error) {
         return await rerender(parsed.error, req.body);
       }
@@ -393,12 +478,13 @@ app.post('/menu', requireAuth, requireRole('owner'), (req, res, next) => {
 
 app.get('/menu/:id/edit', requireAuth, requireRole('owner'), async (req, res, next) => {
   try {
-    const [item, shop] = await Promise.all([
+    const [item, cats, shop] = await Promise.all([
       menuItems.getMenuItemById(db, req.session.user.shopId, req.params.id),
+      categories.getCategoriesForShop(db, req.session.user.shopId),
       shops.getShopById(db, req.session.user.shopId),
     ]);
     if (!item) return res.status(404).send('Item not found.');
-    res.render('menu-item-edit', { item, shop, error: null });
+    res.render('menu-item-edit', { item, categories: cats, shop, error: null });
   } catch (err) {
     next(err);
   }
@@ -409,18 +495,19 @@ app.post('/menu/:id', requireAuth, requireRole('owner'), (req, res, next) => {
     const shopId = req.session.user.shopId;
     try {
       const rerender = async (error) => {
-        const [item, shop] = await Promise.all([
+        const [item, cats, shop] = await Promise.all([
           menuItems.getMenuItemById(db, shopId, req.params.id),
+          categories.getCategoriesForShop(db, shopId),
           shops.getShopById(db, shopId),
         ]);
         if (!item) return res.status(404).send('Item not found.');
-        return res.render('menu-item-edit', { item, shop, error });
+        return res.render('menu-item-edit', { item, categories: cats, shop, error });
       };
       if (uploadErr) {
         const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';
         return await rerender(message);
       }
-      const parsed = parseMenuItemForm(req.body, req.file);
+      const parsed = await parseMenuItemForm(shopId, req.body, req.file);
       if (parsed.error) {
         return await rerender(parsed.error);
       }

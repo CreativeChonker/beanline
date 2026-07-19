@@ -12,17 +12,17 @@
       <div class="panel" style="max-width:480px;">
         <form method="POST" action="/menu/<%= item.id %>" enctype="multipart/form-data">
           <div class="field"><label for="name">Name</label><input id="name" name="name" type="text" value="<%= item.name %>" required></div>
-          <div class="field"><label for="category">Category</label><input id="category" name="category" type="text" value="<%= item.category %>" required></div>
-          <div class="field"><label for="itemType">Type</label>
-            <select id="itemType" name="itemType">
-              <option value="drink" <%= item.item_type === 'drink' ? 'selected' : '' %>>Drink</option>
-              <option value="food" <%= item.item_type === 'food' ? 'selected' : '' %>>Food</option>
+          <div class="field"><label for="categorySelect">Category</label>
+            <select id="categorySelect" name="categoryId">
+              <% categories.forEach((c) => { %>
+                <option value="<%= c.id %>" data-tiers="<%= JSON.stringify(c.tier_names) %>"<%= c.id === item.category_id ? ' selected' : '' %>><%= c.name %><%= c.archived ? ' (archived)' : '' %></option>
+              <% }) %>
             </select>
           </div>
-          <div class="field"><label for="price">Price (S / base)</label><input id="price" name="price" type="number" step="0.01" min="0.01" value="<%= item.price %>" required></div>
-          <div class="field"><label for="priceMedium">Price M (blank = no Medium)</label>
+          <div class="field" id="field-tier-0"><label for="price" id="tier-label-0">Price</label><input id="price" name="price" type="number" step="0.01" min="0.01" value="<%= item.price %>" required></div>
+          <div class="field" id="field-tier-1"><label for="priceMedium" id="tier-label-1">Price</label>
             <input id="priceMedium" name="priceMedium" type="number" step="0.01" min="0.01" value="<%= item.price_medium ?? '' %>"></div>
-          <div class="field"><label for="priceLarge">Price L (blank = no Large)</label>
+          <div class="field" id="field-tier-2"><label for="priceLarge" id="tier-label-2">Price</label>
             <input id="priceLarge" name="priceLarge" type="number" step="0.01" min="0.01" value="<%= item.price_large ?? '' %>"></div>
           <div class="field"><label for="note">Description</label><textarea id="note" name="note" rows="3" style="width:100%;padding:11px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-family:var(--font-body);font-size:14.5px;resize:vertical;"><%= item.note %></textarea></div>
           <div class="field"><label>Photo</label>
@@ -36,6 +36,19 @@
         </form>
       </div>
       <p class="panel-foot"><a href="/menu">Back to menu</a></p>
+      <script>
+        const catSelect = document.getElementById('categorySelect');
+        const syncTiers = () => {
+          const tiers = JSON.parse(catSelect.selectedOptions[0].dataset.tiers);
+          for (let i = 0; i < 3; i++) {
+            const field = document.getElementById('field-tier-' + i);
+            field.style.display = i < tiers.length ? '' : 'none';
+            if (i < tiers.length) document.getElementById('tier-label-' + i).textContent = tiers[i] + (tiers.length > 1 ? ' price' : '') + (i > 0 ? ' (blank = not offered)' : '');
+          }
+        };
+        catSelect.addEventListener('change', syncTiers);
+        syncTiers();
+      </script>
     </div>
   </div>
 </body>

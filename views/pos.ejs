@@ -78,33 +78,23 @@
       </div>
       <% if (error) { %><p class="order-error"><%= error %></p><% } %>
 
-      <% if (menu.length === 0) { %>
+      <% const visibleCats = categories.filter((c) => c.show_when_empty || menu.some((i) => i.category_id === c.id)); %>
+      <% if (visibleCats.length === 0) { %>
         <div class="empty-state">
           <h3>No items yet</h3>
           <p>This shop hasn't added anything to their menu yet.</p>
         </div>
       <% } else { %>
-      <%
-        const cats = [...new Set(menu.map((i) => i.category))];
-        const order = shop.category_order || [];
-        cats.sort((a, b) => {
-          const ia = order.indexOf(a), ib = order.indexOf(b);
-          if (ia !== -1 && ib !== -1) return ia - ib;
-          if (ia !== -1) return -1;
-          if (ib !== -1) return 1;
-          return a.localeCompare(b);
-        });
-      %>
       <div class="content">
         <div class="menu-sections" id="menu-sections">
-          <% cats.forEach((cat) => { %>
-            <div class="pos-section" data-category="<%= cat %>">
-              <h3 class="pos-section-head"><%= cat %></h3>
+          <% visibleCats.forEach((cat) => { %>
+            <div class="pos-section" data-category-id="<%= cat.id %>">
+              <h3 class="pos-section-head"><%= cat.name %></h3>
               <div class="menu-grid">
-                <% menu.filter((i) => i.category === cat).forEach((item) => { %>
+                <% menu.filter((i) => i.category_id === cat.id).forEach((item) => { %>
                   <div class="menu-card" data-id="<%= item.id %>" data-item-name="<%= item.name %>"
-                    data-type="<%= item.item_type %>" data-price="<%= item.price %>"
-                    data-price-medium="<%= item.price_medium ?? '' %>" data-price-large="<%= item.price_large ?? '' %>">
+                    data-tiers="<%= JSON.stringify(item.tier_names) %>" data-drink="<%= item.drink_options %>"
+                    data-prices="<%= JSON.stringify([item.price, item.price_medium, item.price_large]) %>">
                     <div class="menu-name"><%= item.name %></div>
                     <div class="menu-price">$<%= item.price.toFixed(2) %><% if (item.price_medium || item.price_large) { %><span class="menu-price-plus">+</span><% } %></div>
                   </div>
@@ -117,17 +107,7 @@
         <div class="bill-panel">
           <div class="customize-panel" id="customize-panel" hidden>
             <div class="customize-name" id="customize-name"></div>
-            <div class="picker" data-picker="cakesize" id="picker-cakesize" style="display:none;">
-              <button type="button" data-value="slice">Slice</button>
-              <button type="button" data-value="whole">Whole</button>
-            </div>
-            <% if (shop.pos_show_size) { %>
-              <div class="picker" data-picker="size" id="picker-size">
-                <button type="button" data-value="small">S</button>
-                <button type="button" data-value="medium">M</button>
-                <button type="button" data-value="large">L</button>
-              </div>
-            <% } %>
+            <div class="picker" data-picker="tier" id="picker-tier" style="display:none;"></div>
             <% if (shop.pos_show_temp) { %>
               <div class="picker" data-picker="temp" id="picker-temp">
                 <button type="button" data-value="hot">Hot</button>
@@ -185,13 +165,15 @@
       note: <%= shop.pos_show_note %>,
     };
 
-    function itemSizePrice(card, size) {
-      if (size === 'medium' || size === 'whole') return card.dataset.priceMedium ? parseFloat(card.dataset.priceMedium) : null;
-      if (size === 'large') return card.dataset.priceLarge ? parseFloat(card.dataset.priceLarge) : null;
-      return parseFloat(card.dataset.price);
+    function cardInfo(card) {
+      return {
+        tiers: JSON.parse(card.dataset.tiers),
+        prices: JSON.parse(card.dataset.prices),
+        isDrink: card.dataset.drink === 'true',
+      };
     }
 
-    function lineKey(l) { return [l.itemId, l.size || '', l.sugar || '', l.temperature || '', l.note || ''].join('|'); }
+    function lineKey(l) { return [l.itemId, l.tier ?? '', l.sugar || '', l.temperature || '', l.note || ''].join('|'); }
 
     function addLine(line) {
       const key = lineKey(line);
@@ -224,17 +206,24 @@
 
     const panel = document.getElementById('customize-panel');
 
+    // A tier picker is offered when the item's category has more than one priced
+    // tier; the shop's "size" toggle gates it for drink-style categories only.
+    function tierPickerVisible(info) {
+      const priced = info.prices.filter((p, i) => i < info.tiers.length && p != null);
+      if (priced.length < 2) return false;
+      return info.isDrink ? SHOW.size : true;
+    }
+
     document.querySelectorAll('.menu-card').forEach((card) => {
       card.addEventListener('click', () => {
         if (document.body.classList.contains('arranging')) return;
-        const type = card.dataset.type;
-        const isDrink = type === 'drink';
-        const isCake = type === 'cake';
-        const cakeHasWhole = isCake && !!card.dataset.priceMedium;
-        const hasPickers = (isDrink && (SHOW.size || SHOW.sugar || SHOW.temp || SHOW.note))
-          || (isCake && (cakeHasWhole || SHOW.note));
+        const info = cardInfo(card);
+        const showTier = tierPickerVisible(info);
+        const hasPickers = showTier
+          || (info.isDrink && (SHOW.sugar || SHOW.temp))
+          || (SHOW.note && (info.isDrink || showTier));
         if (!hasPickers) {
-          addLine({ itemId: Number(card.dataset.id), name: card.dataset.itemName, qty: 1, price: parseFloat(card.dataset.price) });
+          addLine({ itemId: Number(card.dataset.id), name: card.dataset.itemName, qty: 1, price: info.prices[0] });
           card.classList.add('just-added');
           setTimeout(() => card.classList.remove('just-added'), 400);
           return;
@@ -242,26 +231,28 @@
         pending = card;
         panel.hidden = false;
         document.getElementById('customize-name').textContent = card.dataset.itemName;
-        const sizePicker = document.getElementById('picker-size');
-        if (sizePicker) {
-          sizePicker.querySelectorAll('button').forEach((b) => {
-            b.disabled = itemSizePrice(card, b.dataset.value) === null;
+
+        const tierPicker = document.getElementById('picker-tier');
+        tierPicker.style.display = showTier ? '' : 'none';
+        tierPicker.innerHTML = '';
+        if (showTier) {
+          info.tiers.forEach((name, i) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.value = String(i);
+            btn.textContent = info.isDrink || info.prices[i] == null
+              ? name : name + ' $' + info.prices[i].toFixed(2);
+            btn.disabled = info.prices[i] == null;
+            tierPicker.appendChild(btn);
           });
-          const singleSize = !card.dataset.priceMedium && !card.dataset.priceLarge;
-          sizePicker.style.display = (isDrink && !singleSize) ? '' : 'none';
-          selectDefault('picker-size', 'small');
+          const first = tierPicker.querySelector('button:not(:disabled)');
+          if (first) first.classList.add('selected');
         }
-        const cakePicker = document.getElementById('picker-cakesize');
-        cakePicker.style.display = cakeHasWhole ? '' : 'none';
-        if (cakeHasWhole) {
-          cakePicker.querySelector('[data-value="slice"]').textContent = 'Slice $' + parseFloat(card.dataset.price).toFixed(2);
-          cakePicker.querySelector('[data-value="whole"]').textContent = 'Whole $' + parseFloat(card.dataset.priceMedium).toFixed(2);
-          selectDefault('picker-cakesize', 'slice');
-        }
+
         const sugarPicker = document.getElementById('picker-sugar');
-        if (sugarPicker) sugarPicker.style.display = isCake ? 'none' : '';
+        if (sugarPicker) sugarPicker.style.display = info.isDrink ? '' : 'none';
         const tempPicker = document.getElementById('picker-temp');
-        if (tempPicker) tempPicker.style.display = isCake ? 'none' : '';
+        if (tempPicker) tempPicker.style.display = info.isDrink ? '' : 'none';
         selectDefault('picker-sugar', 'normal');
         selectDefault('picker-temp', 'hot');
         const note = document.getElementById('customize-note');
@@ -271,19 +262,18 @@
 
     document.getElementById('customize-add')?.addEventListener('click', () => {
       if (!pending) return;
-      const isCake = pending.dataset.type === 'cake';
-      const multiSize = pending.dataset.priceMedium || pending.dataset.priceLarge;
-      let size;
-      if (isCake) size = pending.dataset.priceMedium ? pickerValue('picker-cakesize') : undefined;
-      else size = SHOW.size && multiSize ? pickerValue('picker-size') : undefined;
+      const info = cardInfo(pending);
+      const tierValue = tierPickerVisible(info) ? pickerValue('picker-tier') : undefined;
+      const tier = tierValue === undefined ? 0 : Number(tierValue);
       const line = {
         itemId: Number(pending.dataset.id),
         name: pending.dataset.itemName,
         qty: 1,
-        price: itemSizePrice(pending, size),
-        size,
-        sugar: isCake ? undefined : pickerValue('picker-sugar'),
-        temperature: isCake ? undefined : pickerValue('picker-temp'),
+        price: info.prices[tier],
+        tier: tierValue === undefined ? undefined : tier,
+        tierLabel: info.tiers.length > 1 ? info.tiers[tier] : undefined,
+        sugar: info.isDrink ? pickerValue('picker-sugar') : undefined,
+        temperature: info.isDrink ? pickerValue('picker-temp') : undefined,
       };
       const note = document.getElementById('customize-note');
       if (note && note.value.trim()) line.note = note.value.trim();
@@ -308,11 +298,10 @@
       document.getElementById('process-btn').disabled = !(cart.length > 0 && selectedPayment);
     }
 
-    const SIZE_LETTER = { small: 'S', medium: 'M', large: 'L', slice: 'Slice', whole: 'Whole' };
     const SUGAR_LABEL = { none: 'no sugar', less: 'less sugar', extra: 'extra sugar' };
     function detailText(l) {
       const parts = [];
-      if (l.size) parts.push(SIZE_LETTER[l.size]);
+      if (l.tierLabel) parts.push(l.tierLabel);
       if (l.temperature === 'iced') parts.push('iced');
       if (l.sugar && l.sugar !== 'normal') parts.push(SUGAR_LABEL[l.sugar]);
       if (l.note) parts.push('"' + l.note + '"');
@@ -344,7 +333,7 @@
           + '<button type="button" class="remove" onclick="removeLine(' + i + ')">remove</button></div>';
       }).join('');
       document.getElementById('lines-input').value = JSON.stringify(
-        cart.map(({ itemId, qty, size, sugar, temperature, note }) => ({ itemId, qty, size, sugar, temperature, note }))
+        cart.map(({ itemId, qty, tier, sugar, temperature, note }) => ({ itemId, qty, tier, sugar, temperature, note }))
       );
       document.getElementById('bill-count').textContent = count;
       document.getElementById('bill-total').textContent = '$' + total.toFixed(2);
@@ -390,11 +379,11 @@
       });
 
       function saveLayout() {
-        const categoryOrder = [...document.querySelectorAll('.pos-section')].map((s) => s.dataset.category);
+        const categoryOrder = [...document.querySelectorAll('.pos-section')].map((s) => Number(s.dataset.categoryId));
         const items = [];
         document.querySelectorAll('.pos-section').forEach((section) => {
           [...section.querySelectorAll('.menu-card')].forEach((card, i) => {
-            items.push({ id: Number(card.dataset.id), category: section.dataset.category, sortOrder: i });
+            items.push({ id: Number(card.dataset.id), categoryId: Number(section.dataset.categoryId), sortOrder: i });
           });
         });
         fetch('/pos/layout', {

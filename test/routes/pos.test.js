@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { db, migrate, resetDb } = require('../../testHelpers/db');
 const shops = require('../../models/shops');
+const categories = require('../../models/categories');
 const menuItems = require('../../models/menuItems');
 
 before(async () => {
@@ -119,7 +120,7 @@ test('POST /pos excludes unavailable items even if their id is submitted', async
   assert.equal(count.rows[0].n, 0);
 });
 
-test('POST /pos with customized lines snapshots size pricing and stores customizations', async () => {
+test('POST /pos with customized lines snapshots tier pricing and stores customizations', async () => {
   const app = require('../../server');
   const { agent, shopId } = await staffAgentWithMenu(app);
   const latte = await db.query("SELECT id FROM menu_items WHERE shop_id = $1 AND name = 'Latte'", [shopId]);
@@ -128,8 +129,8 @@ test('POST /pos with customized lines snapshots size pricing and stores customiz
   const res = await agent.post('/pos').type('form').send({
     paymentMethod: 'cash',
     lines: JSON.stringify([
-      { itemId: latte.rows[0].id, qty: 1, size: 'large', sugar: 'none', temperature: 'iced', note: 'oat milk' },
-      { itemId: latte.rows[0].id, qty: 2, size: 'small' },
+      { itemId: latte.rows[0].id, qty: 1, tier: 2, sugar: 'none', temperature: 'iced', note: 'oat milk' },
+      { itemId: latte.rows[0].id, qty: 2, tier: 0 },
     ]),
   });
   assert.equal(res.status, 200);
@@ -138,23 +139,23 @@ test('POST /pos with customized lines snapshots size pricing and stores customiz
 
   const order = await db.query('SELECT items_json, total::float8 AS total FROM orders WHERE shop_id = $1', [shopId]);
   const items = JSON.parse(order.rows[0].items_json);
-  assert.equal(items[0].size, 'large');
+  assert.equal(items[0].tier_label, 'Large');
   assert.equal(items[0].price, 5.5);
   assert.equal(items[0].note, 'oat milk');
-  assert.equal(items[1].size, 'small');
+  assert.equal(items[1].tier_label, 'Small');
   assert.equal(order.rows[0].total, 5.5 + 2 * 4.5);
 });
 
-test('POST /pos rejects a size the item does not offer', async () => {
+test('POST /pos rejects a tier the item does not offer', async () => {
   const app = require('../../server');
   const { agent, shopId } = await staffAgentWithMenu(app);
   const espresso = await db.query("SELECT id FROM menu_items WHERE shop_id = $1 AND name = 'Espresso'", [shopId]);
 
   const res = await agent.post('/pos').type('form').send({
     paymentMethod: 'cash',
-    lines: JSON.stringify([{ itemId: espresso.rows[0].id, qty: 1, size: 'large' }]),
+    lines: JSON.stringify([{ itemId: espresso.rows[0].id, qty: 1, tier: 2 }]),
   });
-  assert.match(res.text, /does not come in that size/i);
+  assert.match(res.text, /does not come in that option/i);
   const count = await db.query('SELECT COUNT(*)::int AS n FROM orders WHERE shop_id = $1', [shopId]);
   assert.equal(count.rows[0].n, 0);
 });
@@ -163,7 +164,8 @@ test("POST /pos still cannot ring up another shop's item id", async () => {
   const app = require('../../server');
   const { agent } = await staffAgentWithMenu(app);
   const otherShop = await shops.createShop(db, { name: 'Other', slug: 'other-shop' });
-  const foreign = await menuItems.createMenuItem(db, { shopId: otherShop.id, name: 'Foreign', price: 9, category: 'X' });
+  const otherCat = await categories.createCategory(db, { shopId: otherShop.id, name: 'X' });
+  const foreign = await menuItems.createMenuItem(db, { shopId: otherShop.id, name: 'Foreign', price: 9, categoryId: otherCat.id });
 
   const res = await agent.post('/pos').type('form').send({
     paymentMethod: 'cash',
@@ -175,8 +177,9 @@ test("POST /pos still cannot ring up another shop's item id", async () => {
 test('GET /pos escapes item names in server-rendered card markup', async () => {
   const app = require('../../server');
   const { agent, shopId } = await ownerAgentWithShop(app);
+  const coffee = await db.query("SELECT id FROM categories WHERE shop_id = $1 AND name = 'Coffee'", [shopId]);
   await menuItems.createMenuItem(db, {
-    shopId, name: 'S\'mores <3 & "Latte"', price: 5, category: 'Coffee',
+    shopId, name: 'S\'mores <3 & "Latte"', price: 5, categoryId: coffee.rows[0].id,
   });
   const res = await agent.get('/pos');
   assert.equal(res.status, 200);
@@ -192,7 +195,17 @@ test('GET /pos renders category sections and hides pickers the shop disabled', a
   const res = await agent.get('/pos');
   assert.match(res.text, /class="pos-section"/);
   assert.doesNotMatch(res.text, /data-picker="sugar"/);
-  assert.match(res.text, /data-picker="size"/);
+  assert.match(res.text, /id="picker-tier"/);
+});
+
+test('GET /pos shows empty categories only when show_when_empty is set', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  await categories.createCategory(db, { shopId, name: 'Hidden Empty' });
+  await categories.createCategory(db, { shopId, name: 'Visible Empty', showWhenEmpty: true });
+  const res = await agent.get('/pos');
+  assert.doesNotMatch(res.text, /Hidden Empty/);
+  assert.match(res.text, /Visible Empty/);
 });
 
 test('GET /pos keeps cards text-only even when items have photos', async () => {
@@ -204,18 +217,19 @@ test('GET /pos keeps cards text-only even when items have photos', async () => {
   assert.doesNotMatch(res.text, /img.test\/latte.jpg/);
 });
 
-test('POST /pos rings up a cake by the slice and whole with server-side pricing', async () => {
+test('POST /pos rings up a custom-tier category (Slice/Whole) with server-side pricing', async () => {
   const app = require('../../server');
   const { agent, shopId } = await ownerAgentWithShop(app);
+  const cakes = await categories.createCategory(db, { shopId, name: 'Cakes', tierNames: ['Slice', 'Whole'] });
   const cake = await menuItems.createMenuItem(db, {
-    shopId, name: 'Test Carrot Cake', price: 4.0, category: 'Cakes', itemType: 'cake', priceMedium: 38.0,
+    shopId, name: 'Test Carrot Cake', price: 4.0, categoryId: cakes.id, priceMedium: 38.0,
   });
 
   const res = await agent.post('/pos').type('form').send({
     paymentMethod: 'cash',
     lines: JSON.stringify([
-      { itemId: cake.id, qty: 2, size: 'slice' },
-      { itemId: cake.id, qty: 1, size: 'whole', price: 0.01 },
+      { itemId: cake.id, qty: 2, tier: 0 },
+      { itemId: cake.id, qty: 1, tier: 1, price: 0.01 },
     ]),
   });
   assert.equal(res.status, 200);
@@ -223,37 +237,40 @@ test('POST /pos rings up a cake by the slice and whole with server-side pricing'
 
   const order = await db.query("SELECT items_json, total::float8 AS total FROM orders WHERE shop_id = $1 ORDER BY id DESC LIMIT 1", [shopId]);
   const items = JSON.parse(order.rows[0].items_json);
-  assert.equal(items[0].size, 'slice');
+  assert.equal(items[0].tier_label, 'Slice');
   assert.equal(items[0].price, 4.0);
-  assert.equal(items[1].size, 'whole');
+  assert.equal(items[1].tier_label, 'Whole');
   assert.equal(items[1].price, 38.0);
   assert.equal(order.rows[0].total, 46.0);
 });
 
-test('POST /pos rejects drink sizes on cakes and whole when the cake has no whole price', async () => {
+test('POST /pos rejects out-of-range and unpriced tiers', async () => {
   const app = require('../../server');
   const { agent, shopId } = await ownerAgentWithShop(app);
+  const cakes = await categories.createCategory(db, { shopId, name: 'Cakes', tierNames: ['Slice', 'Whole'] });
   const sliceOnly = await menuItems.createMenuItem(db, {
-    shopId, name: 'Test Brownie Cake', price: 3.5, category: 'Cakes', itemType: 'cake',
+    shopId, name: 'Test Brownie Cake', price: 3.5, categoryId: cakes.id,
   });
 
   const bad1 = await agent.post('/pos').type('form').send({
-    paymentMethod: 'cash', lines: JSON.stringify([{ itemId: sliceOnly.id, qty: 1, size: 'large' }]),
+    paymentMethod: 'cash', lines: JSON.stringify([{ itemId: sliceOnly.id, qty: 1, tier: 2 }]),
   });
-  assert.match(bad1.text, /does not come in that size/i);
+  assert.match(bad1.text, /does not come in that option/i);
 
   const bad2 = await agent.post('/pos').type('form').send({
-    paymentMethod: 'cash', lines: JSON.stringify([{ itemId: sliceOnly.id, qty: 1, size: 'whole' }]),
+    paymentMethod: 'cash', lines: JSON.stringify([{ itemId: sliceOnly.id, qty: 1, tier: 1 }]),
   });
-  assert.match(bad2.text, /does not come in that size/i);
+  assert.match(bad2.text, /does not come in that option/i);
 
   const count = await db.query('SELECT COUNT(*)::int AS n FROM orders WHERE shop_id = $1', [shopId]);
   assert.equal(count.rows[0].n, 0);
 });
 
-test('GET /pos renders the slice/whole picker markup', async () => {
+test('GET /pos renders the generic tier picker and no hardcoded size markup', async () => {
   const app = require('../../server');
   const { agent } = await ownerAgentWithShop(app);
   const res = await agent.get('/pos');
-  assert.match(res.text, /data-picker="cakesize"/);
+  assert.match(res.text, /id="picker-tier"/);
+  assert.doesNotMatch(res.text, /data-picker="cakesize"/);
+  assert.doesNotMatch(res.text, /data-picker="size"/);
 });

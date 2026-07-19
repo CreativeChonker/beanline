@@ -94,3 +94,41 @@ ALTER TABLE shops ADD COLUMN IF NOT EXISTS pos_show_note BOOLEAN NOT NULL DEFAUL
 ALTER TABLE shops ADD COLUMN IF NOT EXISTS category_order TEXT[];
 
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+CREATE TABLE IF NOT EXISTS categories (
+  id SERIAL PRIMARY KEY,
+  shop_id INTEGER NOT NULL REFERENCES shops(id),
+  name TEXT NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  archived BOOLEAN NOT NULL DEFAULT false,
+  show_when_empty BOOLEAN NOT NULL DEFAULT false,
+  tier_names TEXT[] NOT NULL DEFAULT ARRAY['Price'],
+  drink_options BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (shop_id, name)
+);
+CREATE INDEX IF NOT EXISTS categories_shop_id_idx ON categories(shop_id);
+
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id);
+
+-- Backfill: promote each shop's legacy category strings to category rows,
+-- inferring tiers from the item types that lived under them.
+INSERT INTO categories (shop_id, name, display_order, tier_names, drink_options)
+SELECT m.shop_id, m.category,
+  COALESCE(array_position(s.category_order, m.category) - 1, 999),
+  CASE WHEN bool_or(m.item_type = 'drink') THEN ARRAY['Small','Medium','Large']
+       WHEN bool_or(m.item_type = 'cake') THEN ARRAY['Slice','Whole']
+       ELSE ARRAY['Price'] END,
+  bool_or(m.item_type = 'drink')
+FROM menu_items m JOIN shops s ON s.id = m.shop_id
+WHERE m.category_id IS NULL AND m.category IS NOT NULL
+GROUP BY m.shop_id, m.category, s.category_order
+ON CONFLICT (shop_id, name) DO NOTHING;
+
+UPDATE menu_items m SET category_id = c.id
+FROM categories c
+WHERE m.category_id IS NULL AND m.category IS NOT NULL
+  AND c.shop_id = m.shop_id AND c.name = m.category;
+
+ALTER TABLE menu_items ALTER COLUMN category DROP NOT NULL;
+ALTER TABLE menu_items ALTER COLUMN item_type DROP NOT NULL;
