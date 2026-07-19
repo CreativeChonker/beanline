@@ -1,5 +1,5 @@
 {
-  "name": "coffee-shop-app",
+  "name": "beanline",
   "version": "1.0.0",
   "private": true,
   "main": "server.js",

@@ -396,7 +396,7 @@ app.post('/shop/settings', requireAuth, requireRole('owner'), (req, res, next) =
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Coffee shop app running at http://localhost:${PORT}`);
+    console.log(`Beanline running at http://localhost:${PORT}`);
   });
 }
 
