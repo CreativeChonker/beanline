@@ -3,46 +3,68 @@
 <html>
 <head><title>Menu · Beanline</title><%- include('partials-head') %>
 <style>
-  .menu-editor { margin-bottom: 28px; }
-  .menu-section { margin-bottom: 26px; }
-  .menu-section:last-child { margin-bottom: 0; }
-  .menu-section-head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  .menu-topbar-actions { display: flex; align-items: center; gap: 12px; }
+  .menu-sub { color: var(--ink-soft); font-size: 14px; margin: 4px 0 0; }
+  .menu-section { background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 18px; overflow: hidden; }
+  .menu-section-toggle {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 14px 18px; background: #fffdf8; border: none; border-bottom: 1px solid var(--line);
+    font-family: var(--font-display); font-weight: 600; font-size: 16px; color: var(--ink);
+    cursor: pointer; text-align: left;
   }
-  .menu-section-head h3 { font-size: 15px; letter-spacing: 0.01em; }
-  .menu-section-head span { font-size: 12px; color: var(--ink-soft); font-family: var(--font-mono); }
-  .menu-row {
-    display: flex; align-items: center; gap: 14px;
-    padding: 12px 0;
-    border-bottom: 1px dashed var(--line);
-  }
+  .menu-section-toggle .cat-icon { width: 20px; height: 20px; color: var(--gold-deep); flex-shrink: 0; }
+  .menu-section-toggle .count { margin-left: auto; font-family: var(--font-mono); font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+  .menu-section-toggle .chev { width: 16px; height: 16px; color: var(--ink-soft); transition: transform 0.2s ease; }
+  .menu-section.collapsed .chev { transform: rotate(180deg); }
+  .menu-section.collapsed .menu-rows { display: none; }
+  .menu-section.collapsed .menu-section-toggle { border-bottom: none; }
+  .menu-row { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--parchment-2); }
   .menu-row:last-child { border-bottom: none; }
   .menu-row.unavailable { opacity: 0.55; }
+  .menu-thumb, .menu-thumb-placeholder {
+    width: 48px; height: 48px; border-radius: 10px; flex-shrink: 0;
+    border: 1px solid var(--line); object-fit: cover;
+  }
+  .menu-thumb-placeholder { display: flex; align-items: center; justify-content: center; background: var(--parchment); color: var(--line); }
+  .menu-thumb-placeholder svg { width: 22px; height: 22px; }
   .menu-row-info { flex: 1; min-width: 0; }
   .menu-row-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
-  .menu-row-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
-  .status-pill {
-    display: inline-block; flex-shrink: 0;
-    font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
-    background: rgba(217,164,65,0.16); color: var(--gold-deep);
-  }
+  .menu-row-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status-pill { display: inline-block; flex-shrink: 0; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(217,164,65,0.16); color: var(--gold-deep); }
   .status-pill.sold-out { background: rgba(156,59,44,0.08); color: var(--cherry-deep); }
   .menu-row-price { font-family: var(--font-mono); font-size: 14px; color: var(--gold-deep); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
-  .menu-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .menu-row-actions { display: flex; gap: 6px; flex-shrink: 0; position: relative; }
   .menu-row-actions form { display: inline; }
-  .btn-small { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); text-decoration: none; }
+  .btn-small { padding: 7px 13px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); text-decoration: none; }
   .btn-small:hover { border-color: var(--gold); color: var(--gold-deep); }
-  .btn-small.danger:hover { border-color: var(--cherry); color: var(--cherry-deep); }
+  .overflow-wrap { position: relative; }
+  .overflow-btn { width: 32px; }
+  .overflow-menu {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; display: none;
+    background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 4px;
+    box-shadow: 0 12px 28px -12px rgba(0,0,0,0.35); min-width: 120px;
+  }
+  .overflow-wrap.open .overflow-menu { display: block; }
+  .overflow-menu button { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; background: none; border-radius: 6px; font-size: 13px; color: var(--cherry-deep); cursor: pointer; }
+  .overflow-menu button:hover { background: rgba(156,59,44,0.08); }
   .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
   .empty-state h3 { font-size: 18px; color: var(--ink); margin-bottom: 6px; }
-  .add-item-panel { background: var(--parchment); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
-  .add-item-form { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 10px; align-items: end; }
+  .add-item-panel { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+  .add-item-panel h3 { display: flex; align-items: center; gap: 9px; margin-bottom: 16px; font-size: 17px; }
+  .add-item-panel h3 svg { width: 19px; height: 19px; color: var(--gold-deep); }
+  .add-item-form { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: end; }
   .add-item-form .field { margin: 0; }
-  @media (max-width: 760px) {
-    .menu-row { flex-wrap: wrap; }
-    .add-item-form { grid-template-columns: 1fr 1fr; }
+  .add-item-form .span-2 { grid-column: span 2; }
+  .upload-box {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border: 1.5px dashed var(--line); border-radius: 9px; background: var(--parchment); cursor: pointer;
+    color: var(--ink-soft); font-size: 12.5px;
   }
+  .upload-box:hover { border-color: var(--gold); color: var(--gold-deep); }
+  .upload-box svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .upload-box input { display: none; }
+  .upload-box .upload-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 900px) { .add-item-form { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -51,27 +73,51 @@
 
     <div class="app-main">
       <div class="app-topbar">
-        <h1 style="font-size:26px;">Menu</h1>
+        <div>
+          <h1 style="font-size:30px;">Menu</h1>
+          <p class="menu-sub">Manage your menu items, prices, and availability.</p>
+        </div>
+        <div class="menu-topbar-actions">
+          <a href="#add-item-panel" class="btn btn-primary" id="add-item-btn" style="width:auto;margin:0;padding:10px 16px;">+ Add New Item</a>
+        </div>
       </div>
       <% if (error) { %><p class="order-error"><%= error %></p><% } %>
 
-      <div class="menu-editor">
-        <% if (items.length === 0) { %>
-          <div class="empty-state">
-            <h3>No items yet</h3>
-            <p>Add your first menu item below.</p>
-          </div>
-        <% } else { %>
-          <% const categories = [...new Set(items.map((i) => i.category))]; %>
-          <% categories.forEach((cat) => { %>
-            <% const catItems = items.filter((i) => i.category === cat); %>
-            <div class="menu-section">
-              <div class="menu-section-head">
-                <h3><%= cat %></h3>
-                <span><%= catItems.length %> item<%= catItems.length === 1 ? '' : 's' %></span>
-              </div>
+      <% if (items.length === 0) { %>
+        <div class="empty-state"><h3>No items yet</h3><p>Add your first menu item below.</p></div>
+      <% } else { %>
+        <%
+          const categories = [...new Set(items.map((i) => i.category))];
+          const catIcon = (cat) => {
+            const c = cat.toLowerCase();
+            if (/bak|food|pastr|snack|bread|sandwich/.test(c)) return 'pastry';
+            if (/tea|matcha/.test(c)) return 'leaf';
+            return 'cup';
+          };
+        %>
+        <% categories.forEach((cat) => { %>
+          <% const catItems = items.filter((i) => i.category === cat); %>
+          <div class="menu-section">
+            <button type="button" class="menu-section-toggle">
+              <% if (catIcon(cat) === 'pastry') { %>
+                <svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4c-5 0-9 5.5-9 9a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3c0-3.5-4-9-9-9z"/><path d="M8.5 9.5c1-1.5 2.2-2.3 3.5-2.3s2.5.8 3.5 2.3"/></svg>
+              <% } else if (catIcon(cat) === 'leaf') { %>
+                <svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 4 13c0-5 4-9 9-9a7 7 0 0 1 7 7c0 5-4 9-9 9z"/><path d="M4 21c4-4 7-6 12-8"/></svg>
+              <% } else { %>
+                <svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg>
+              <% } %>
+              <%= cat %>
+              <span class="count"><%= catItems.length %> item<%= catItems.length === 1 ? '' : 's' %></span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg>
+            </button>
+            <div class="menu-rows">
               <% catItems.forEach((item) => { %>
                 <div class="menu-row <%= item.available ? '' : 'unavailable' %>">
+                  <% if (item.image_url) { %>
+                    <img class="menu-thumb" src="<%= item.image_url %>" alt="">
+                  <% } else { %>
+                    <div class="menu-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg></div>
+                  <% } %>
                   <div class="menu-row-info">
                     <div class="menu-row-name"><%= item.name %></div>
                     <% if (item.note) { %><div class="menu-row-note"><%= item.note %></div><% } %>
@@ -81,31 +127,85 @@
                   <div class="menu-row-actions">
                     <a class="btn-small" href="/menu/<%= item.id %>/edit">Edit</a>
                     <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small"><%= item.available ? 'Mark unavailable' : 'Restock' %></button></form>
-                    <form method="POST" action="/menu/<%= item.id %>/delete"><button type="submit" class="btn-small danger">Remove</button></form>
+                    <div class="overflow-wrap">
+                      <button type="button" class="btn-small overflow-btn" aria-label="More actions">&#8943;</button>
+                      <div class="overflow-menu">
+                        <form method="POST" action="/menu/<%= item.id %>/delete"><button type="submit">Remove</button></form>
+                      </div>
+                    </div>
                   </div>
                 </div>
               <% }) %>
             </div>
-          <% }) %>
-        <% } %>
-      </div>
-
-      <div class="add-item-panel">
-        <h3 style="margin-bottom:14px;">Add an item</h3>
-        <form method="POST" action="/menu" class="add-item-form">
-          <div class="field"><label for="name">Name</label><input id="name" name="name" type="text" value="<%= values.name || '' %>" required></div>
-          <div class="field"><label for="category">Category</label><input id="category" name="category" type="text" value="<%= values.category || '' %>" required></div>
-          <div class="field"><label for="itemType">Type</label>
-            <select id="itemType" name="itemType"><option value="drink">Drink</option><option value="food">Food</option></select>
           </div>
-          <div class="field"><label for="price">Price (S / base)</label><input id="price" name="price" type="number" step="0.01" min="0.01" value="<%= values.price || '' %>" required></div>
-          <div class="field"><label for="priceMedium">Price M</label><input id="priceMedium" name="priceMedium" type="number" step="0.01" min="0.01" value="<%= values.priceMedium || '' %>"></div>
-          <div class="field"><label for="priceLarge">Price L</label><input id="priceLarge" name="priceLarge" type="number" step="0.01" min="0.01" value="<%= values.priceLarge || '' %>"></div>
-          <div class="field"><label for="note">Note</label><input id="note" name="note" type="text" value="<%= values.note || '' %>"></div>
-          <button type="submit" class="btn btn-primary" style="margin-top:0;">Add</button>
+        <% }) %>
+      <% } %>
+
+      <div class="add-item-panel" id="add-item-panel">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg> Add a New Item</h3>
+        <% const cats = [...new Set(items.map((i) => i.category))]; %>
+        <form method="POST" action="/menu" class="add-item-form" enctype="multipart/form-data">
+          <div class="field span-2"><label for="name">Name</label><input id="name" name="name" type="text" required placeholder="Enter item name" value="<%= values.name || '' %>"></div>
+          <div class="field"><label for="categorySelect">Category</label>
+            <select id="categorySelect" name="category">
+              <% cats.forEach((c) => { %><option value="<%= c %>"<%= values.category === c ? ' selected' : '' %>><%= c %></option><% }) %>
+              <option value="__new__">New category…</option>
+            </select>
+            <input id="categoryNew" name="categoryNew" type="text" placeholder="New category name" style="display:none;margin-top:6px;" value="">
+          </div>
+          <div class="field"><label for="itemType">Type</label>
+            <select id="itemType" name="itemType"><option value="drink" <%= values.itemType === 'drink' ? 'selected' : '' %>>Drink</option><option value="food" <%= values.itemType === 'food' ? 'selected' : '' %>>Food</option></select>
+          </div>
+          <div class="field"><label for="price">Price (S / Base)</label><input id="price" name="price" type="number" step="0.01" min="0.01" required placeholder="0.00" value="<%= values.price || '' %>"></div>
+          <div class="field"><label for="priceMedium">Price M</label><input id="priceMedium" name="priceMedium" type="number" step="0.01" min="0.01" placeholder="0.00" value="<%= values.priceMedium || '' %>"></div>
+          <div class="field"><label for="priceLarge">Price L</label><input id="priceLarge" name="priceLarge" type="number" step="0.01" min="0.01" placeholder="0.00" value="<%= values.priceLarge || '' %>"></div>
+          <div class="field span-2"><label for="note">Note</label><input id="note" name="note" type="text" placeholder="Add a note (ingredients, description, etc.)" value="<%= values.note || '' %>"></div>
+          <div class="field span-2"><label>Image</label>
+            <label class="upload-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.6-4.6a1.5 1.5 0 0 0-2.1 0L5 20"/></svg>
+              <span><span class="upload-name" id="upload-name">Upload Image</span><br>JPG, PNG or WEBP up to 5MB</span>
+              <input id="itemImage" name="itemImage" type="file" accept="image/jpeg,image/png,image/webp">
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin:0;">Add Item</button>
         </form>
       </div>
     </div>
   </div>
+  <script>
+    document.querySelectorAll('.menu-section-toggle').forEach((btn) => {
+      btn.addEventListener('click', () => btn.closest('.menu-section').classList.toggle('collapsed'));
+    });
+    document.querySelectorAll('.overflow-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wrap = btn.closest('.overflow-wrap');
+        document.querySelectorAll('.overflow-wrap.open').forEach((w) => { if (w !== wrap) w.classList.remove('open'); });
+        wrap.classList.toggle('open');
+      });
+    });
+    document.addEventListener('click', () => document.querySelectorAll('.overflow-wrap.open').forEach((w) => w.classList.remove('open')));
+
+    const catSelect = document.getElementById('categorySelect');
+    const catNew = document.getElementById('categoryNew');
+    if (catSelect) {
+      const syncCatSelect = () => {
+        const isNew = catSelect.value === '__new__';
+        catNew.style.display = isNew ? '' : 'none';
+        if (isNew) { catSelect.removeAttribute('name'); catNew.setAttribute('name', 'category'); }
+        else { catSelect.setAttribute('name', 'category'); catNew.removeAttribute('name'); }
+      };
+      catSelect.addEventListener('change', () => { syncCatSelect(); if (catSelect.value === '__new__') catNew.focus(); });
+      syncCatSelect();
+    }
+
+    const fileInput = document.getElementById('itemImage');
+    if (fileInput) fileInput.addEventListener('change', () => {
+      document.getElementById('upload-name').textContent = fileInput.files[0] ? fileInput.files[0].name : 'Upload Image';
+    });
+
+    const addBtn = document.getElementById('add-item-btn');
+    if (addBtn) addBtn.addEventListener('click', () => setTimeout(() => document.getElementById('name').focus(), 300));
+  </script>
 </body>
 </html>

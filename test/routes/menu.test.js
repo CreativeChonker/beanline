@@ -220,3 +220,25 @@ test('POST /menu/:id with a new photo replaces the old URL', async () => {
   assert.notEqual(after.rows[0].image_url, before.rows[0].image_url);
   assert.match(after.rows[0].image_url, /^http/);
 });
+
+test('GET /menu renders collapsible sections, thumbnails, and the category dropdown', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await ownerAgentWithShop(app);
+  await db.query("UPDATE menu_items SET image_url = 'http://img.test/x.jpg' WHERE shop_id = $1 AND name = 'Latte'", [shopId]);
+  const res = await agent.get('/menu');
+  assert.match(res.text, /class="menu-section-toggle"/);
+  assert.match(res.text, /src="http:\/\/img.test\/x.jpg"/);
+  assert.match(res.text, /class="menu-thumb-placeholder"/);
+  assert.match(res.text, /<option value="Coffee">/);
+  assert.match(res.text, /New category…/);
+  assert.match(res.text, /id="add-item-btn"/);
+});
+
+test('the row overflow menu holds Remove and the row keeps Edit and Mark unavailable', async () => {
+  const app = require('../../server');
+  const { agent } = await ownerAgentWithShop(app);
+  const res = await agent.get('/menu');
+  assert.match(res.text, /class="overflow-menu"/);
+  assert.match(res.text, /Mark unavailable/);
+  assert.match(res.text, /Remove/);
+});
