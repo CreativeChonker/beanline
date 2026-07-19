@@ -65,3 +65,24 @@ CREATE TABLE IF NOT EXISTS menu_items (
 );
 
 CREATE INDEX IF NOT EXISTS menu_items_shop_id_idx ON menu_items(shop_id);
+
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS item_type TEXT NOT NULL DEFAULT 'drink';
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS price_medium NUMERIC(10,2);
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS price_large NUMERIC(10,2);
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'menu_items_item_type_check'
+  ) THEN
+    ALTER TABLE menu_items ADD CONSTRAINT menu_items_item_type_check
+      CHECK (item_type IN ('drink', 'food'));
+  END IF;
+END $$;
+
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS pos_show_size BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS pos_show_sugar BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS pos_show_temp BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS pos_show_note BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS category_order TEXT[];
