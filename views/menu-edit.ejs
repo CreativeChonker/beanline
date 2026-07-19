@@ -28,7 +28,17 @@
   .menu-thumb-placeholder { display: flex; align-items: center; justify-content: center; background: var(--parchment); color: var(--line); }
   .menu-thumb-placeholder svg { width: 22px; height: 22px; }
   .menu-row-info { flex: 1; min-width: 0; }
-  .menu-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .col-status { width: 100px; flex-shrink: 0; text-align: center; }
+  .col-price { width: 150px; flex-shrink: 0; text-align: right; }
+  .col-actions { width: 232px; flex-shrink: 0; justify-content: flex-end; }
+  .menu-cols-head {
+    display: flex; align-items: center; gap: 14px; padding: 8px 18px;
+    background: var(--parchment); border-bottom: 1px solid var(--line);
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    font-weight: 700; color: var(--ink-soft);
+  }
+  .menu-cols-head .col-item { flex: 1; }
+  .menu-cols-head .col-thumb { width: 48px; flex-shrink: 0; }
   .menu-row-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
   .menu-row-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status-pill { display: inline-block; flex-shrink: 0; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(62,125,79,0.14); color: var(--green-deep); border: 1px solid rgba(62,125,79,0.25); }
@@ -121,6 +131,13 @@
               <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 15-6-6-6 6"/></svg>
             </button>
             <div class="menu-rows">
+              <div class="menu-cols-head">
+                <div class="col-thumb"></div>
+                <div class="col-item">Item</div>
+                <div class="col-status">Status</div>
+                <div class="col-price">Price S/M/L</div>
+                <div class="col-actions"></div>
+              </div>
               <% catItems.forEach((item) => { %>
                 <div class="menu-row <%= item.available ? '' : 'unavailable' %>">
                   <% if (item.image_url) { %>
@@ -129,14 +146,12 @@
                     <div class="menu-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg></div>
                   <% } %>
                   <div class="menu-row-info">
-                    <div class="menu-row-head">
-                      <span class="menu-row-name"><%= item.name %></span>
-                      <span class="status-pill <%= item.available ? '' : 'sold-out' %>"><%= item.available ? 'Available' : 'Sold out' %></span>
-                      <span class="menu-row-price">$<%= item.price.toFixed(2) %><% if (item.price_medium) { %> / $<%= item.price_medium.toFixed(2) %><% } %><% if (item.price_large) { %> / $<%= item.price_large.toFixed(2) %><% } %></span>
-                    </div>
+                    <div class="menu-row-name"><%= item.name %></div>
                     <% if (item.note) { %><div class="menu-row-note"><%= item.note %></div><% } %>
                   </div>
-                  <div class="menu-row-actions">
+                  <div class="col-status"><span class="status-pill <%= item.available ? '' : 'sold-out' %>"><%= item.available ? 'Available' : 'Sold out' %></span></div>
+                  <div class="col-price menu-row-price">$<%= item.price.toFixed(2) %><% if (item.price_medium) { %> / $<%= item.price_medium.toFixed(2) %><% } %><% if (item.price_large) { %> / $<%= item.price_large.toFixed(2) %><% } %></div>
+                  <div class="menu-row-actions col-actions">
                     <a class="btn-small" href="/menu/<%= item.id %>/edit">Edit</a>
                     <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small"><%= item.available ? 'Mark unavailable' : 'Restock' %></button></form>
                     <div class="overflow-wrap">
