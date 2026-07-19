@@ -3,7 +3,6 @@
 <html>
 <head><title>Menu · Beanline</title><%- include('partials-head') %>
 <style>
-  .menu-topbar-actions { display: flex; align-items: center; gap: 12px; }
   .menu-sub { color: var(--ink-soft); font-size: 14px; margin: 4px 0 0; }
   .menu-section { background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 18px; overflow: hidden; }
   .menu-section-toggle {
@@ -29,6 +28,7 @@
   .menu-thumb-placeholder svg { width: 22px; height: 22px; }
   .menu-row-info { flex: 1; min-width: 0; }
   .col-status { width: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .col-prices { width: 214px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 14px; }
   .col-size { width: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .col-wide { width: 96px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .price-empty { color: var(--line); font-weight: 400; }
@@ -95,9 +95,6 @@
           <h1 style="font-size:30px;">Menu</h1>
           <p class="menu-sub">Manage your menu items, prices, and availability.</p>
         </div>
-        <div class="menu-topbar-actions">
-          <a href="#add-item-panel" class="btn btn-primary" id="add-item-btn" style="width:auto;margin:0;padding:10px 16px;">+ Add New Item</a>
-        </div>
       </div>
       <% if (error) { %><p class="order-error"><%= error %></p><% } %>
 
@@ -139,6 +136,7 @@
                 <div class="col-thumb"></div>
                 <div class="col-item">Item</div>
                 <div class="col-status">Status</div>
+                <div class="col-prices">
                 <% if (sectionMode === 'drink') { %>
                   <div class="col-size">Small</div>
                   <div class="col-size">Medium</div>
@@ -149,6 +147,7 @@
                 <% } else { %>
                   <div class="col-wide">Price</div>
                 <% } %>
+                </div>
                 <div class="col-actions"></div>
               </div>
               <% catItems.forEach((item) => { %>
@@ -162,6 +161,7 @@
                     <% if (item.note) { %><div class="menu-row-note"><%= item.note %></div><% } %>
                   </div>
                   <div class="col-status"><span class="status-pill <%= item.available ? '' : 'sold-out' %>"><%= item.available ? 'Available' : 'Sold out' %></span></div>
+                  <div class="col-prices">
                   <% if (sectionMode === 'drink') { %>
                     <div class="col-size menu-row-price">$<%= item.price.toFixed(2) %></div>
                     <div class="col-size menu-row-price"><% if (item.price_medium) { %>$<%= item.price_medium.toFixed(2) %><% } else { %><span class="price-empty">&ndash;</span><% } %></div>
@@ -172,8 +172,9 @@
                   <% } else if (sectionMode === 'food') { %>
                     <div class="col-wide menu-row-price">$<%= item.price.toFixed(2) %></div>
                   <% } else { %>
-                    <div class="col-wide menu-row-price">$<%= item.price.toFixed(2) %><% if (item.price_medium) { %> / <%= item.price_medium.toFixed(2) %><% } %><% if (item.price_large) { %> / <%= item.price_large.toFixed(2) %><% } %></div>
+                    <div class="col-wide menu-row-price" style="width:auto;">$<%= item.price.toFixed(2) %><% if (item.price_medium) { %> / <%= item.price_medium.toFixed(2) %><% } %><% if (item.price_large) { %> / <%= item.price_large.toFixed(2) %><% } %></div>
                   <% } %>
+                  </div>
                   <div class="menu-row-actions col-actions">
                     <a class="btn-small btn-edit" href="/menu/<%= item.id %>/edit">Edit</a>
                     <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small <%= item.available ? 'btn-soldout' : 'btn-restock' %>"><%= item.available ? 'Sold out' : 'Restock' %></button></form>
@@ -266,9 +267,6 @@
     if (fileInput) fileInput.addEventListener('change', () => {
       document.getElementById('upload-name').textContent = fileInput.files[0] ? fileInput.files[0].name : 'Upload Image';
     });
-
-    const addBtn = document.getElementById('add-item-btn');
-    if (addBtn) addBtn.addEventListener('click', () => setTimeout(() => document.getElementById('name').focus(), 300));
   </script>
 </body>
 </html>

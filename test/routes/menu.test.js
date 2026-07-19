@@ -231,7 +231,8 @@ test('GET /menu renders collapsible sections, thumbnails, and the category dropd
   assert.match(res.text, /class="menu-thumb-placeholder"/);
   assert.match(res.text, /<option value="Coffee">/);
   assert.match(res.text, /New category…/);
-  assert.match(res.text, /id="add-item-btn"/);
+  assert.doesNotMatch(res.text, /id="add-item-btn"/);
+  assert.match(res.text, /class="col-prices"/);
 });
 
 test('each row has Edit, a Sold out toggle, and a confirming delete form', async () => {
