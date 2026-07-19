@@ -155,7 +155,7 @@ test('the menu editor uses plain language instead of "86 it"', async () => {
   await agent.post('/menu').type('form').send({ name: 'Test Latte', category: 'Coffee', price: '4.50', itemType: 'drink' });
   const res = await agent.get('/menu');
   assert.doesNotMatch(res.text, /86 it/);
-  assert.match(res.text, /Mark unavailable/);
+  assert.match(res.text, /class="btn-small btn-soldout">Sold out</);
 });
 
 test('POST /menu with a photo stores it in object storage and saves the URL', async () => {
@@ -234,13 +234,15 @@ test('GET /menu renders collapsible sections, thumbnails, and the category dropd
   assert.match(res.text, /id="add-item-btn"/);
 });
 
-test('the row overflow menu holds Remove and the row keeps Edit and Mark unavailable', async () => {
+test('each row has Edit, a Sold out toggle, and a confirming delete form', async () => {
   const app = require('../../server');
   const { agent } = await ownerAgentWithShop(app);
   const res = await agent.get('/menu');
-  assert.match(res.text, /class="overflow-menu"/);
-  assert.match(res.text, /Mark unavailable/);
-  assert.match(res.text, /Remove/);
+  assert.match(res.text, /class="btn-small btn-edit"/);
+  assert.match(res.text, /class="btn-small btn-soldout">Sold out</);
+  assert.match(res.text, /class="delete-form" data-item-name=/);
+  assert.match(res.text, /aria-label="Remove /);
+  assert.doesNotMatch(res.text, /class="overflow-menu"/);
 });
 
 test('a validation error keeps a typed new category in the re-rendered form', async () => {

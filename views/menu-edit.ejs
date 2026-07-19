@@ -28,10 +28,10 @@
   .menu-thumb-placeholder { display: flex; align-items: center; justify-content: center; background: var(--parchment); color: var(--line); }
   .menu-thumb-placeholder svg { width: 22px; height: 22px; }
   .menu-row-info { flex: 1; min-width: 0; }
-  .col-status { width: 100px; flex-shrink: 0; text-align: center; }
-  .col-size { width: 62px; flex-shrink: 0; text-align: center; }
+  .col-status { width: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .col-size { width: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .price-empty { color: var(--line); font-weight: 400; }
-  .col-actions { width: 232px; flex-shrink: 0; justify-content: flex-end; }
+  .col-actions { width: 190px; flex-shrink: 0; justify-content: flex-end; }
   .menu-cols-head {
     display: flex; align-items: center; gap: 14px; padding: 8px 18px;
     background: var(--parchment); border-bottom: 1px solid var(--line);
@@ -48,17 +48,15 @@
   .menu-row-actions { display: flex; gap: 6px; flex-shrink: 0; position: relative; }
   .menu-row-actions form { display: inline; }
   .btn-small { padding: 7px 13px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); text-decoration: none; }
-  .btn-small:hover { border-color: var(--gold); color: var(--gold-deep); }
-  .overflow-wrap { position: relative; }
-  .overflow-btn { width: 32px; }
-  .overflow-menu {
-    position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; display: none;
-    background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 4px;
-    box-shadow: 0 12px 28px -12px rgba(0,0,0,0.35); min-width: 120px;
-  }
-  .overflow-wrap.open .overflow-menu { display: block; }
-  .overflow-menu button { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; background: none; border-radius: 6px; font-size: 13px; color: var(--cherry-deep); cursor: pointer; }
-  .overflow-menu button:hover { background: rgba(156,59,44,0.08); }
+  .btn-small.btn-edit { background: rgba(217,164,65,0.10); border-color: rgba(217,164,65,0.4); color: var(--gold-deep); }
+  .btn-small.btn-edit:hover { background: rgba(217,164,65,0.2); }
+  .btn-small.btn-soldout { background: rgba(156,59,44,0.07); border-color: rgba(156,59,44,0.25); color: var(--cherry-deep); }
+  .btn-small.btn-soldout:hover { background: rgba(156,59,44,0.15); }
+  .btn-small.btn-restock { background: rgba(62,125,79,0.10); border-color: rgba(62,125,79,0.3); color: var(--green-deep); }
+  .btn-small.btn-restock:hover { background: rgba(62,125,79,0.2); }
+  .btn-small.btn-trash { width: 32px; padding: 7px 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(156,59,44,0.07); border-color: rgba(156,59,44,0.25); color: var(--cherry-deep); }
+  .btn-small.btn-trash:hover { background: rgba(156,59,44,0.18); }
+  .btn-small.btn-trash svg { width: 14px; height: 14px; }
   .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
   .empty-state h3 { font-size: 18px; color: var(--ink); margin-bottom: 6px; }
   .menu-layout { display: flex; gap: 20px; align-items: flex-start; }
@@ -143,11 +141,10 @@
               </div>
               <% catItems.forEach((item) => { %>
                 <div class="menu-row <%= item.available ? '' : 'unavailable' %>">
-                  <% if (item.image_url) { %>
-                    <img class="menu-thumb" src="<%= item.image_url %>" alt="">
-                  <% } else { %>
-                    <div class="menu-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg></div>
-                  <% } %>
+                  <% const placeholder = item.item_type === 'food' ? '/img/placeholder-food.jpg' : '/img/placeholder-drink.jpg'; %>
+                  <img class="menu-thumb" src="<%= item.image_url || placeholder %>" alt=""
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                  <div class="menu-thumb-placeholder" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg></div>
                   <div class="menu-row-info">
                     <div class="menu-row-name"><%= item.name %></div>
                     <% if (item.note) { %><div class="menu-row-note"><%= item.note %></div><% } %>
@@ -157,14 +154,13 @@
                   <div class="col-size menu-row-price"><% if (item.price_medium) { %>$<%= item.price_medium.toFixed(2) %><% } else { %><span class="price-empty">&ndash;</span><% } %></div>
                   <div class="col-size menu-row-price"><% if (item.price_large) { %>$<%= item.price_large.toFixed(2) %><% } else { %><span class="price-empty">&ndash;</span><% } %></div>
                   <div class="menu-row-actions col-actions">
-                    <a class="btn-small" href="/menu/<%= item.id %>/edit">Edit</a>
-                    <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small"><%= item.available ? 'Mark unavailable' : 'Restock' %></button></form>
-                    <div class="overflow-wrap">
-                      <button type="button" class="btn-small overflow-btn" aria-label="More actions">&#8943;</button>
-                      <div class="overflow-menu">
-                        <form method="POST" action="/menu/<%= item.id %>/delete"><button type="submit">Remove</button></form>
-                      </div>
-                    </div>
+                    <a class="btn-small btn-edit" href="/menu/<%= item.id %>/edit">Edit</a>
+                    <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small <%= item.available ? 'btn-soldout' : 'btn-restock' %>"><%= item.available ? 'Sold out' : 'Restock' %></button></form>
+                    <form method="POST" action="/menu/<%= item.id %>/delete" class="delete-form" data-item-name="<%= item.name %>">
+                      <button type="submit" class="btn-small btn-trash" aria-label="Remove <%= item.name %>">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                      </button>
+                    </form>
                   </div>
                 </div>
               <% }) %>
@@ -213,15 +209,11 @@
     document.querySelectorAll('.menu-section-toggle').forEach((btn) => {
       btn.addEventListener('click', () => btn.closest('.menu-section').classList.toggle('collapsed'));
     });
-    document.querySelectorAll('.overflow-btn').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const wrap = btn.closest('.overflow-wrap');
-        document.querySelectorAll('.overflow-wrap.open').forEach((w) => { if (w !== wrap) w.classList.remove('open'); });
-        wrap.classList.toggle('open');
+    document.querySelectorAll('.delete-form').forEach((form) => {
+      form.addEventListener('submit', (e) => {
+        if (!confirm('Remove "' + form.dataset.itemName + '" from the menu? This cannot be undone.')) e.preventDefault();
       });
     });
-    document.addEventListener('click', () => document.querySelectorAll('.overflow-wrap.open').forEach((w) => w.classList.remove('open')));
 
     const catSelect = document.getElementById('categorySelect');
     const catNew = document.getElementById('categoryNew');

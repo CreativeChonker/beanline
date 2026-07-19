@@ -21,6 +21,7 @@ app.set('view engine', 'ejs');
 app.set('views', __dirname + '/views');
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(express.static('public'));
 const pgSession = require('connect-pg-simple')(session);
 
 app.use(
