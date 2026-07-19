@@ -9,6 +9,9 @@ const orders = require('./models/orders');
 const menuItems = require('./models/menuItems');
 const seedMenu = require('./db/seed-menu');
 const { requireAuth, requireRole, loadShopBySlug } = require('./middleware/auth');
+const multer = require('multer');
+const storage = require('./lib/storage');
+const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -346,6 +349,44 @@ app.post('/menu/:id/delete', requireAuth, requireRole('owner'), async (req, res,
   } catch (err) {
     next(err);
   }
+});
+
+app.get('/shop/settings', requireAuth, requireRole('owner'), async (req, res, next) => {
+  try {
+    const shop = await shops.getShopById(db, req.session.user.shopId);
+    res.render('shop-settings', { shop, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/shop/settings', requireAuth, requireRole('owner'), (req, res, next) => {
+  upload.single('coverPhoto')(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      const shop = await shops.getShopById(db, req.session.user.shopId).catch(() => null);
+      const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';
+      return res.render('shop-settings', { shop, error: message });
+    }
+
+    const tagline = (req.body.tagline || '').trim() || null;
+
+    try {
+      let coverPhotoUrl = null;
+      if (req.file) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(req.file.mimetype)) {
+          const shop = await shops.getShopById(db, req.session.user.shopId);
+          return res.render('shop-settings', { shop, error: 'Please upload a JPG, PNG, or WEBP image.' });
+        }
+        const ext = req.file.mimetype.split('/')[1];
+        const key = `shops/${req.session.user.shopId}/cover-${Date.now()}.${ext}`;
+        coverPhotoUrl = await storage.uploadImage(req.file.buffer, key, req.file.mimetype);
+      }
+      const updated = await shops.updateShopProfile(db, req.session.user.shopId, { tagline, coverPhotoUrl });
+      res.render('shop-settings', { shop: updated, error: null, saved: true });
+    } catch (err) {
+      next(err);
+    }
+  });
 });
 
 if (require.main === module) {
