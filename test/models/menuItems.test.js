@@ -169,3 +169,30 @@ test('updateLayout can move an item to another category and never touches anothe
   const untouchedB = await menuItems.getMenuItemById(db, shopB.id, itemB.id);
   assert.equal(untouchedB.category, 'Coffee');
 });
+
+test('createMenuItem stores an image url and defaults to null', async () => {
+  const shop = await shops.createShop(db, { name: 'Blue Bottle', slug: 'blue-bottle' });
+  const plain = await menuItems.createMenuItem(db, { shopId: shop.id, name: 'Latte', price: 4.5, category: 'Coffee' });
+  assert.equal(plain.image_url, null);
+  const pictured = await menuItems.createMenuItem(db, {
+    shopId: shop.id, name: 'Mocha', price: 5, category: 'Coffee', imageUrl: 'http://img.test/mocha.jpg',
+  });
+  assert.equal(pictured.image_url, 'http://img.test/mocha.jpg');
+});
+
+test('setItemImage sets the photo, is shop-scoped, and updateMenuItem leaves it untouched', async () => {
+  const shopA = await shops.createShop(db, { name: 'Shop A', slug: 'shop-a' });
+  const shopB = await shops.createShop(db, { name: 'Shop B', slug: 'shop-b' });
+  const item = await menuItems.createMenuItem(db, { shopId: shopA.id, name: 'Latte', price: 4.5, category: 'Coffee' });
+
+  const cross = await menuItems.setItemImage(db, shopB.id, item.id, 'http://img.test/hacked.jpg');
+  assert.equal(cross, null);
+
+  const set = await menuItems.setItemImage(db, shopA.id, item.id, 'http://img.test/latte.jpg');
+  assert.equal(set.image_url, 'http://img.test/latte.jpg');
+
+  const updated = await menuItems.updateMenuItem(db, shopA.id, item.id, {
+    name: 'Latte', price: 4.75, category: 'Coffee', note: '', itemType: 'drink', priceMedium: null, priceLarge: null,
+  });
+  assert.equal(updated.image_url, 'http://img.test/latte.jpg');
+});

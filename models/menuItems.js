@@ -1,12 +1,12 @@
 const ITEM_COLUMNS = `id, shop_id, name, price::float8 AS price, category, note, available,
-  item_type, price_medium::float8 AS price_medium, price_large::float8 AS price_large, sort_order`;
+  item_type, price_medium::float8 AS price_medium, price_large::float8 AS price_large, sort_order, image_url`;
 
-async function createMenuItem(queryable, { shopId, name, price, category, note, itemType = 'drink', priceMedium = null, priceLarge = null }) {
+async function createMenuItem(queryable, { shopId, name, price, category, note, itemType = 'drink', priceMedium = null, priceLarge = null, imageUrl = null }) {
   const result = await queryable.query(
-    `INSERT INTO menu_items (shop_id, name, price, category, note, item_type, price_medium, price_large)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO menu_items (shop_id, name, price, category, note, item_type, price_medium, price_large, image_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING ${ITEM_COLUMNS}`,
-    [shopId, name, price, category, note || '', itemType, priceMedium, priceLarge]
+    [shopId, name, price, category, note || '', itemType, priceMedium, priceLarge, imageUrl]
   );
   return result.rows[0];
 }
@@ -68,4 +68,12 @@ async function updateLayout(queryable, shopId, items) {
   return count;
 }
 
-module.exports = { createMenuItem, getMenuItemsForShop, getMenuItemById, updateMenuItem, toggleAvailability, deleteMenuItem, updateLayout };
+async function setItemImage(queryable, shopId, id, imageUrl) {
+  const result = await queryable.query(
+    `UPDATE menu_items SET image_url = $1 WHERE id = $2 AND shop_id = $3 RETURNING ${ITEM_COLUMNS}`,
+    [imageUrl, id, shopId]
+  );
+  return result.rows[0] || null;
+}
+
+module.exports = { createMenuItem, getMenuItemsForShop, getMenuItemById, updateMenuItem, toggleAvailability, deleteMenuItem, updateLayout, setItemImage };
