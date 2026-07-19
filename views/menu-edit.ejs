@@ -29,7 +29,8 @@
   .menu-thumb-placeholder svg { width: 22px; height: 22px; }
   .menu-row-info { flex: 1; min-width: 0; }
   .col-status { width: 100px; flex-shrink: 0; text-align: center; }
-  .col-price { width: 150px; flex-shrink: 0; text-align: right; }
+  .col-size { width: 62px; flex-shrink: 0; text-align: center; }
+  .price-empty { color: var(--line); font-weight: 400; }
   .col-actions { width: 232px; flex-shrink: 0; justify-content: flex-end; }
   .menu-cols-head {
     display: flex; align-items: center; gap: 14px; padding: 8px 18px;
@@ -43,7 +44,7 @@
   .menu-row-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status-pill { display: inline-block; flex-shrink: 0; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(62,125,79,0.14); color: var(--green-deep); border: 1px solid rgba(62,125,79,0.25); }
   .status-pill.sold-out { background: rgba(156,59,44,0.12); color: var(--cherry-deep); border-color: rgba(156,59,44,0.3); }
-  .menu-row-price { font-family: var(--font-mono); font-size: 16px; color: var(--gold-deep); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  .menu-row-price { font-family: var(--font-mono); font-size: 14.5px; color: var(--ink); font-weight: 700; white-space: nowrap; }
   .menu-row-actions { display: flex; gap: 6px; flex-shrink: 0; position: relative; }
   .menu-row-actions form { display: inline; }
   .btn-small { padding: 7px 13px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); text-decoration: none; }
@@ -135,7 +136,9 @@
                 <div class="col-thumb"></div>
                 <div class="col-item">Item</div>
                 <div class="col-status">Status</div>
-                <div class="col-price">Price S/M/L</div>
+                <div class="col-size">Small</div>
+                <div class="col-size">Medium</div>
+                <div class="col-size">Large</div>
                 <div class="col-actions"></div>
               </div>
               <% catItems.forEach((item) => { %>
@@ -150,7 +153,9 @@
                     <% if (item.note) { %><div class="menu-row-note"><%= item.note %></div><% } %>
                   </div>
                   <div class="col-status"><span class="status-pill <%= item.available ? '' : 'sold-out' %>"><%= item.available ? 'Available' : 'Sold out' %></span></div>
-                  <div class="col-price menu-row-price">$<%= item.price.toFixed(2) %><% if (item.price_medium) { %> / $<%= item.price_medium.toFixed(2) %><% } %><% if (item.price_large) { %> / $<%= item.price_large.toFixed(2) %><% } %></div>
+                  <div class="col-size menu-row-price">$<%= item.price.toFixed(2) %></div>
+                  <div class="col-size menu-row-price"><% if (item.price_medium) { %>$<%= item.price_medium.toFixed(2) %><% } else { %><span class="price-empty">&ndash;</span><% } %></div>
+                  <div class="col-size menu-row-price"><% if (item.price_large) { %>$<%= item.price_large.toFixed(2) %><% } else { %><span class="price-empty">&ndash;</span><% } %></div>
                   <div class="menu-row-actions col-actions">
                     <a class="btn-small" href="/menu/<%= item.id %>/edit">Edit</a>
                     <form method="POST" action="/menu/<%= item.id %>/toggle"><button type="submit" class="btn-small"><%= item.available ? 'Mark unavailable' : 'Restock' %></button></form>
