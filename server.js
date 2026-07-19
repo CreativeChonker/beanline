@@ -317,6 +317,33 @@ async function uploadItemImage(shopId, itemId, file) {
   return storage.uploadImage(file.buffer, key, file.mimetype);
 }
 
+function parseMenuItemForm(body, file) {
+  const { name, category, price, note, itemType, priceMedium, priceLarge } = body;
+  const parsedPrice = parseFloat(price);
+  const parseSize = (v) => {
+    if (v === undefined || v === '') return null;
+    const n = parseFloat(v);
+    return Number.isNaN(n) || n <= 0 ? undefined : n;
+  };
+  const parsedMedium = parseSize(priceMedium);
+  const parsedLarge = parseSize(priceLarge);
+  if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
+      || parsedMedium === undefined || parsedLarge === undefined) {
+    return { error: 'Please provide a name, category, and a valid price.' };
+  }
+  if (file && !ITEM_IMAGE_TYPES.includes(file.mimetype)) {
+    return { error: 'Please upload a JPG, PNG, or WEBP image.' };
+  }
+  return {
+    fields: {
+      name, category, note: note || '',
+      price: parsedPrice,
+      itemType: itemType === 'food' ? 'food' : 'drink',
+      priceMedium: parsedMedium, priceLarge: parsedLarge,
+    },
+  };
+}
+
 app.get('/menu', requireAuth, requireRole('owner'), async (req, res, next) => {
   try {
     const [items, shop] = await Promise.all([
@@ -342,29 +369,13 @@ app.post('/menu', requireAuth, requireRole('owner'), (req, res, next) => {
     try {
       if (uploadErr) {
         const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';
-        return rerender(message, req.body);
+        return await rerender(message, req.body);
       }
-      const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
-      const parsedPrice = parseFloat(price);
-      const type = itemType === 'food' ? 'food' : 'drink';
-      const parseSize = (v) => {
-        if (v === undefined || v === '') return null;
-        const n = parseFloat(v);
-        return Number.isNaN(n) || n <= 0 ? undefined : n;
-      };
-      const parsedMedium = parseSize(priceMedium);
-      const parsedLarge = parseSize(priceLarge);
-      if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
-          || parsedMedium === undefined || parsedLarge === undefined) {
-        return rerender('Please provide a name, category, and a valid price.', req.body);
+      const parsed = parseMenuItemForm(req.body, req.file);
+      if (parsed.error) {
+        return await rerender(parsed.error, req.body);
       }
-      if (req.file && !ITEM_IMAGE_TYPES.includes(req.file.mimetype)) {
-        return rerender('Please upload a JPG, PNG, or WEBP image.', req.body);
-      }
-      const item = await menuItems.createMenuItem(db, {
-        shopId, name, category, price: parsedPrice, note: note || '',
-        itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge,
-      });
+      const item = await menuItems.createMenuItem(db, { shopId, ...parsed.fields });
       if (req.file) {
         const url = await uploadItemImage(shopId, item.id, req.file);
         await menuItems.setItemImage(db, shopId, item.id, url);
@@ -405,24 +416,11 @@ app.post('/menu/:id', requireAuth, requireRole('owner'), (req, res, next) => {
         const message = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Image must be under 5MB.' : 'Upload failed.';
         return await rerender(message);
       }
-      const { name, category, price, note, itemType, priceMedium, priceLarge } = req.body;
-      const parsedPrice = parseFloat(price);
-      const type = itemType === 'food' ? 'food' : 'drink';
-      const parseSize = (v) => {
-        if (v === undefined || v === '') return null;
-        const n = parseFloat(v);
-        return Number.isNaN(n) || n <= 0 ? undefined : n;
-      };
-      const parsedMedium = parseSize(priceMedium);
-      const parsedLarge = parseSize(priceLarge);
-      if (!name || !category || !price || Number.isNaN(parsedPrice) || parsedPrice <= 0
-          || parsedMedium === undefined || parsedLarge === undefined) {
-        return await rerender('Please provide a name, category, and a valid price.');
+      const parsed = parseMenuItemForm(req.body, req.file);
+      if (parsed.error) {
+        return await rerender(parsed.error);
       }
-      if (req.file && !ITEM_IMAGE_TYPES.includes(req.file.mimetype)) {
-        return await rerender('Please upload a JPG, PNG, or WEBP image.');
-      }
-      const updated = await menuItems.updateMenuItem(db, shopId, req.params.id, { name, category, price: parsedPrice, note: note || '', itemType: type, priceMedium: parsedMedium, priceLarge: parsedLarge });
+      const updated = await menuItems.updateMenuItem(db, shopId, req.params.id, { ...parsed.fields });
       if (!updated) return res.status(404).send('Item not found.');
       if (req.file) {
         const url = await uploadItemImage(shopId, req.params.id, req.file);
