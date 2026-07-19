@@ -99,3 +99,28 @@ test('POST /shop/settings with no new photo leaves the existing photo untouched'
   assert.equal(after.rows[0].cover_photo_url, before.rows[0].cover_photo_url);
   assert.equal(after.rows[0].tagline, 'Second, no new photo');
 });
+
+test('POST /shop/settings saves POS option toggles', async () => {
+  const app = require('../../server');
+  const agent = await ownerAgentWithShop(app);
+  const res = await agent.post('/shop/settings')
+    .field('tagline', 'Cozy')
+    .field('posShowSize', 'on')
+    .field('posShowNote', 'on');
+  assert.equal(res.status, 200);
+
+  const row = await db.query('SELECT pos_show_size, pos_show_sugar, pos_show_temp, pos_show_note FROM shops WHERE slug = $1', ['blue-bottle']);
+  assert.deepEqual(row.rows[0], {
+    pos_show_size: true, pos_show_sugar: false, pos_show_temp: false, pos_show_note: true,
+  });
+});
+
+test('GET /shop/settings renders the POS option checkboxes', async () => {
+  const app = require('../../server');
+  const agent = await ownerAgentWithShop(app);
+  const res = await agent.get('/shop/settings');
+  assert.match(res.text, /name="posShowSize"/);
+  assert.match(res.text, /name="posShowSugar"/);
+  assert.match(res.text, /name="posShowTemp"/);
+  assert.match(res.text, /name="posShowNote"/);
+});

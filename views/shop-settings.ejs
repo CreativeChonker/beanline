@@ -48,6 +48,13 @@
             <% } %>
             <input id="coverPhoto" name="coverPhoto" type="file" accept="image/jpeg,image/png,image/webp">
           </div>
+          <div class="field" style="margin-top:16px;">
+            <label>POS options — which fields staff see at the register</label>
+            <label style="display:block;font-weight:400;margin-top:6px;"><input type="checkbox" name="posShowSize" <%= shop.pos_show_size ? 'checked' : '' %>> Cup size (S/M/L)</label>
+            <label style="display:block;font-weight:400;"><input type="checkbox" name="posShowSugar" <%= shop.pos_show_sugar ? 'checked' : '' %>> Sugar level</label>
+            <label style="display:block;font-weight:400;"><input type="checkbox" name="posShowTemp" <%= shop.pos_show_temp ? 'checked' : '' %>> Hot / Iced</label>
+            <label style="display:block;font-weight:400;"><input type="checkbox" name="posShowNote" <%= shop.pos_show_note ? 'checked' : '' %>> Free-text note</label>
+          </div>
           <button type="submit" class="btn btn-primary" style="margin-top:16px;">Save</button>
         </form>
       </div>

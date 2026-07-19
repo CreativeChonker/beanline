@@ -407,7 +407,13 @@ app.post('/shop/settings', requireAuth, requireRole('owner'), (req, res, next) =
         coverPhotoUrl = await storage.uploadImage(req.file.buffer, key, req.file.mimetype);
       }
       const updated = await shops.updateShopProfile(db, req.session.user.shopId, { tagline, coverPhotoUrl });
-      res.render('shop-settings', { shop: updated, error: null, saved: true });
+      const withOptions = await shops.updatePosOptions(db, req.session.user.shopId, {
+        showSize: req.body.posShowSize === 'on',
+        showSugar: req.body.posShowSugar === 'on',
+        showTemp: req.body.posShowTemp === 'on',
+        showNote: req.body.posShowNote === 'on',
+      });
+      res.render('shop-settings', { shop: withOptions, error: null, saved: true });
     } catch (err) {
       next(err);
     }
