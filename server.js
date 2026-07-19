@@ -11,6 +11,7 @@ const seedMenu = require('./db/seed-menu');
 const { requireAuth, requireRole, loadShopBySlug } = require('./middleware/auth');
 const multer = require('multer');
 const storage = require('./lib/storage');
+const posLines = require('./lib/posLines');
 const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 const app = express();
@@ -225,7 +226,7 @@ app.post('/:shopSlug/order', requireAuth, requireRole('customer'), loadShopBySlu
 app.get('/dashboard', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
   try {
     const shopOrders = await orders.getOrdersForShop(db, req.session.user.shopId);
-    res.render('dashboard', { orders: shopOrders });
+    res.render('dashboard', { orders: shopOrders, formatLine: posLines.formatLineDetails });
   } catch (err) {
     next(err);
   }
@@ -233,8 +234,11 @@ app.get('/dashboard', requireAuth, requireRole('owner', 'staff'), async (req, re
 
 app.get('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
   try {
-    const items = await menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true });
-    res.render('pos', { menu: items, error: null });
+    const [items, shop] = await Promise.all([
+      menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true }),
+      shops.getShopById(db, req.session.user.shopId),
+    ]);
+    res.render('pos', { menu: items, shop, error: null, formatLine: posLines.formatLineDetails });
   } catch (err) {
     next(err);
   }
@@ -243,29 +247,21 @@ app.get('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, nex
 app.post('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, next) => {
   const { paymentMethod } = req.body;
   try {
-    const availableItems = await menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true });
-    const items = [];
-    let total = 0;
-    for (const item of availableItems) {
-      const qty = parseInt(req.body['qty_' + item.id], 10) || 0;
-      if (qty > 0) {
-        items.push({ name: item.name, qty, price: item.price });
-        total += qty * item.price;
-      }
-    }
+    const [availableItems, shop] = await Promise.all([
+      menuItems.getMenuItemsForShop(db, req.session.user.shopId, { availableOnly: true }),
+      shops.getShopById(db, req.session.user.shopId),
+    ]);
+    const rerender = (error) => res.render('pos', { menu: availableItems, shop, error, formatLine: posLines.formatLineDetails });
 
-    if (items.length === 0) {
-      return res.render('pos', { menu: availableItems, error: 'Please select at least one item.' });
-    }
-    if (!['cash', 'card'].includes(paymentMethod)) {
-      return res.render('pos', { menu: availableItems, error: 'Please choose a payment method.' });
-    }
+    const parsed = posLines.parseAndPriceLines(req.body.lines || '', availableItems);
+    if (parsed.error) return rerender(parsed.error);
+    if (!['cash', 'card'].includes(paymentMethod)) return rerender('Please choose a payment method.');
 
     const created = await orders.createOrder(db, {
       staffUserId: req.session.user.id,
       shopId: req.session.user.shopId,
-      items,
-      total,
+      items: parsed.lines,
+      total: parsed.total,
       status: 'completed',
       paymentMethod,
     });
@@ -274,11 +270,12 @@ app.post('/pos', requireAuth, requireRole('owner', 'staff'), async (req, res, ne
       sale: {
         order_id: created.id,
         staff_name: req.session.user.name,
-        lineItems: items,
-        total: total.toFixed(2),
+        lineItems: parsed.lines,
+        total: parsed.total.toFixed(2),
         payment_method: paymentMethod,
         created_at: created.created_at,
       },
+      formatLine: posLines.formatLineDetails,
     });
   } catch (err) {
     next(err);

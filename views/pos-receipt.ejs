@@ -45,8 +45,9 @@
         </div>
         <div class="receipt-items">
           <% sale.lineItems.forEach(item => { %>
+            <% const details = formatLine(item); %>
             <div class="receipt-line">
-              <span><%= item.name %> &times;<%= item.qty %></span>
+              <span><%= item.name %> &times;<%= item.qty %><% if (details) { %><span style="display:block;font-size:11px;color:var(--ink-soft);"><%= details %></span><% } %></span>
               <span class="dots"></span>
               <span>$<%= (item.price * item.qty).toFixed(2) %></span>
             </div>

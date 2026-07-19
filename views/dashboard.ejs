@@ -95,7 +95,7 @@
                       <div class="cust-email">rung up by <%= o.staff_name %></div>
                     <% } %>
                   </td>
-                  <td><%= o.items.map(i => `${i.name} ×${i.qty}`).join(', ') %></td>
+                  <td><%= o.items.map(i => `${i.name} ×${i.qty}${formatLine(i) ? ` (${formatLine(i)})` : ''}`).join(', ') %></td>
                   <td class="order-total">$<%= o.total.toFixed(2) %></td>
                   <td><span class="status-pill"><%= o.status %></span></td>
                   <td class="order-time"><%= o.created_at %></td>

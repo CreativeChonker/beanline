@@ -87,9 +87,12 @@ test('a POS sale rung up by shop A\'s staff can never touch shop B\'s menu, even
   const shopBItem = await db.query('SELECT id FROM menu_items WHERE shop_id = $1 LIMIT 1', [shopBRow.rows[0].id]);
 
   // Shop A's owner tries to ring up shop B's item id on their own POS.
-  const res = await ownerA.post('/pos').type('form').send({ ['qty_' + shopBItem.rows[0].id]: '1', paymentMethod: 'cash' });
+  const res = await ownerA.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([{ itemId: shopBItem.rows[0].id, qty: 1 }]),
+  });
   assert.equal(res.status, 200);
-  assert.match(res.text, /select at least one item/);
+  assert.match(res.text, /no longer available/i);
 
   const shopARow = await db.query('SELECT id FROM shops WHERE slug = $1', ['blue-bottle']);
   const salesForShopA = await db.query('SELECT * FROM orders WHERE shop_id = $1', [shopARow.rows[0].id]);

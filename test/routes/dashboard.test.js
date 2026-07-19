@@ -92,7 +92,10 @@ test('GET /dashboard shows walk-in sales distinctly from self-orders', async () 
   const shopRow = await db.query('SELECT id FROM shops WHERE slug = $1', ['blue-bottle']);
   const itemRow = await db.query('SELECT id FROM menu_items WHERE shop_id = $1 LIMIT 1', [shopRow.rows[0].id]);
 
-  await ownerAgent.post('/pos').type('form').send({ ['qty_' + itemRow.rows[0].id]: '1', paymentMethod: 'cash' });
+  await ownerAgent.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([{ itemId: itemRow.rows[0].id, qty: 1 }]),
+  });
 
   const res = await ownerAgent.get('/dashboard');
   assert.equal(res.status, 200);

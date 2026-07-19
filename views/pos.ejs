@@ -52,6 +52,18 @@
     .content { flex-direction: column; }
     .bill-panel { width: 100%; position: static; }
   }
+  .menu-sections { flex: 1; display: flex; flex-direction: column; gap: 22px; }
+  .pos-section-head { font-size: 14px; letter-spacing: 0.02em; color: var(--ink-soft); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .menu-price-plus { color: var(--ink-soft); margin-left: 2px; }
+  .customize-panel { background: #fff; border: 1px solid var(--gold); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .customize-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; margin-bottom: 10px; }
+  .picker { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .picker button { flex: 1; padding: 8px 6px; border-radius: 7px; border: 1px solid var(--line); background: #fff; font-size: 12px; font-weight: 600; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+  .picker button.selected { border-color: var(--espresso); background: var(--espresso); color: var(--gold); }
+  .picker button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .customize-note { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font-size: 12.5px; margin-bottom: 10px; }
+  .customize-add { width: 100%; }
+  .bill-item .line-details { display: block; font-size: 11px; color: var(--ink-soft); }
 </style>
 </head>
 <body>
@@ -83,26 +95,66 @@
           <p>This shop hasn't added anything to their menu yet.</p>
         </div>
       <% } else { %>
-      <% const categories = [...new Set(menu.map((i) => i.category))]; %>
-      <div class="categories" id="categories">
-        <div class="category-pill active" data-category="all">All</div>
-        <% categories.forEach((cat) => { %>
-          <div class="category-pill" data-category="<%= cat %>"><%= cat %></div>
-        <% }) %>
-      </div>
-
+      <%
+        const cats = [...new Set(menu.map((i) => i.category))];
+        const order = shop.category_order || [];
+        cats.sort((a, b) => {
+          const ia = order.indexOf(a), ib = order.indexOf(b);
+          if (ia !== -1 && ib !== -1) return ia - ib;
+          if (ia !== -1) return -1;
+          if (ib !== -1) return 1;
+          return a.localeCompare(b);
+        });
+      %>
       <div class="content">
-        <div class="menu-grid" id="menu-grid">
-          <% menu.forEach(item => { %>
-            <div class="menu-card" data-category="<%= item.category %>"
-              data-id="<%= item.id %>" data-item-name="<%= item.name %>" data-price="<%= item.price %>">
-              <div class="menu-name"><%= item.name %></div>
-              <div class="menu-price">$<%= item.price.toFixed(2) %></div>
+        <div class="menu-sections" id="menu-sections">
+          <% cats.forEach((cat) => { %>
+            <div class="pos-section" data-category="<%= cat %>">
+              <h3 class="pos-section-head"><%= cat %></h3>
+              <div class="menu-grid">
+                <% menu.filter((i) => i.category === cat).forEach((item) => { %>
+                  <div class="menu-card" data-id="<%= item.id %>" data-item-name="<%= item.name %>"
+                    data-type="<%= item.item_type %>" data-price="<%= item.price %>"
+                    data-price-medium="<%= item.price_medium ?? '' %>" data-price-large="<%= item.price_large ?? '' %>">
+                    <div class="menu-name"><%= item.name %></div>
+                    <div class="menu-price">$<%= item.price.toFixed(2) %><% if (item.price_medium || item.price_large) { %><span class="menu-price-plus">+</span><% } %></div>
+                  </div>
+                <% }) %>
+              </div>
             </div>
           <% }) %>
         </div>
 
         <div class="bill-panel">
+          <div class="customize-panel" id="customize-panel" hidden>
+            <div class="customize-name" id="customize-name"></div>
+            <% if (shop.pos_show_size) { %>
+              <div class="picker" data-picker="size" id="picker-size">
+                <button type="button" data-value="small">S</button>
+                <button type="button" data-value="medium">M</button>
+                <button type="button" data-value="large">L</button>
+              </div>
+            <% } %>
+            <% if (shop.pos_show_temp) { %>
+              <div class="picker" data-picker="temp" id="picker-temp">
+                <button type="button" data-value="hot">Hot</button>
+                <button type="button" data-value="iced">Iced</button>
+              </div>
+            <% } %>
+            <% if (shop.pos_show_sugar) { %>
+              <div class="picker" data-picker="sugar" id="picker-sugar">
+                <button type="button" data-value="none">No sugar</button>
+                <button type="button" data-value="less">Less</button>
+                <button type="button" data-value="normal">Normal</button>
+                <button type="button" data-value="extra">Extra</button>
+              </div>
+            <% } %>
+            <% if (shop.pos_show_note) { %>
+              <input type="text" class="customize-note" id="customize-note" maxlength="140" placeholder="Note (oat milk, extra hot…)">
+            <% } %>
+            <button type="button" class="btn btn-primary customize-add" id="customize-add">Add to sale</button>
+          </div>
+
           <div class="receipt">
             <h2>Current sale</h2>
             <div id="bill-list"><p class="bill-empty">Tap an item to add it.</p></div>
@@ -117,7 +169,7 @@
               <div class="payment-choice" data-method="card">Card</div>
             </div>
             <form method="POST" action="/pos" id="pos-form">
-              <div id="hidden-inputs"></div>
+              <input type="hidden" name="lines" id="lines-input">
               <input type="hidden" name="paymentMethod" id="payment-method-input">
               <button type="submit" class="process-btn" id="process-btn" disabled>Complete sale</button>
             </form>
@@ -129,39 +181,108 @@
   </div>
 
   <script>
-    const cart = {};
+    const cart = []; // [{ itemId, name, qty, price, size, sugar, temperature, note }]
     let selectedPayment = null;
+    let pending = null; // item awaiting customization
 
-    document.querySelectorAll('.category-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        const activeCat = pill.dataset.category;
-        document.querySelectorAll('.menu-card').forEach(card => {
-          card.style.display = (activeCat === 'all' || card.dataset.category === activeCat) ? '' : 'none';
-        });
+    const SHOW = {
+      size: <%= shop.pos_show_size %>,
+      sugar: <%= shop.pos_show_sugar %>,
+      temp: <%= shop.pos_show_temp %>,
+      note: <%= shop.pos_show_note %>,
+    };
+
+    function itemSizePrice(card, size) {
+      if (size === 'medium') return card.dataset.priceMedium ? parseFloat(card.dataset.priceMedium) : null;
+      if (size === 'large') return card.dataset.priceLarge ? parseFloat(card.dataset.priceLarge) : null;
+      return parseFloat(card.dataset.price);
+    }
+
+    function lineKey(l) { return [l.itemId, l.size || '', l.sugar || '', l.temperature || '', l.note || ''].join('|'); }
+
+    function addLine(line) {
+      const key = lineKey(line);
+      const existing = cart.find((l) => lineKey(l) === key);
+      if (existing) existing.qty += line.qty; else cart.push(line);
+      renderBill();
+    }
+
+    function pickerValue(id) {
+      const el = document.getElementById(id);
+      if (!el) return undefined;
+      const sel = el.querySelector('button.selected');
+      return sel ? sel.dataset.value : undefined;
+    }
+
+    function selectDefault(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b.dataset.value === value));
+    }
+
+    document.querySelectorAll('.picker').forEach((p) => {
+      p.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn || btn.disabled) return;
+        p.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
       });
     });
 
-    document.querySelectorAll('.menu-card').forEach(card => {
+    const panel = document.getElementById('customize-panel');
+
+    document.querySelectorAll('.menu-card').forEach((card) => {
       card.addEventListener('click', () => {
-        const id = card.dataset.id;
-        const name = card.dataset.itemName;
-        const price = parseFloat(card.dataset.price);
-        if (cart[id]) {
-          cart[id].qty += 1;
-        } else {
-          cart[id] = { name, price, qty: 1 };
+        if (document.body.classList.contains('arranging')) return;
+        const isDrink = card.dataset.type === 'drink';
+        const hasPickers = isDrink && (SHOW.size || SHOW.sugar || SHOW.temp || SHOW.note);
+        if (!hasPickers) {
+          addLine({ itemId: Number(card.dataset.id), name: card.dataset.itemName, qty: 1, price: parseFloat(card.dataset.price) });
+          card.classList.add('just-added');
+          setTimeout(() => card.classList.remove('just-added'), 400);
+          return;
         }
-        renderBill();
-        card.classList.add('just-added');
-        setTimeout(() => card.classList.remove('just-added'), 400);
+        pending = card;
+        panel.hidden = false;
+        document.getElementById('customize-name').textContent = card.dataset.itemName;
+        const sizePicker = document.getElementById('picker-size');
+        if (sizePicker) {
+          sizePicker.querySelectorAll('button').forEach((b) => {
+            b.disabled = itemSizePrice(card, b.dataset.value) === null;
+          });
+          const singleSize = !card.dataset.priceMedium && !card.dataset.priceLarge;
+          sizePicker.style.display = singleSize ? 'none' : '';
+          selectDefault('picker-size', 'small');
+        }
+        selectDefault('picker-sugar', 'normal');
+        selectDefault('picker-temp', 'hot');
+        const note = document.getElementById('customize-note');
+        if (note) note.value = '';
       });
     });
 
-    document.querySelectorAll('.payment-choice').forEach(choice => {
+    document.getElementById('customize-add')?.addEventListener('click', () => {
+      if (!pending) return;
+      const size = (SHOW.size && pending.dataset.priceMedium) || (SHOW.size && pending.dataset.priceLarge) ? pickerValue('picker-size') : undefined;
+      const line = {
+        itemId: Number(pending.dataset.id),
+        name: pending.dataset.itemName,
+        qty: 1,
+        price: itemSizePrice(pending, size),
+        size,
+        sugar: pickerValue('picker-sugar'),
+        temperature: pickerValue('picker-temp'),
+      };
+      const note = document.getElementById('customize-note');
+      if (note && note.value.trim()) line.note = note.value.trim();
+      addLine(line);
+      panel.hidden = true;
+      pending = null;
+    });
+
+    document.querySelectorAll('.payment-choice').forEach((choice) => {
       choice.addEventListener('click', () => {
-        document.querySelectorAll('.payment-choice').forEach(c => c.classList.remove('selected'));
+        document.querySelectorAll('.payment-choice').forEach((c) => c.classList.remove('selected'));
         choice.classList.add('selected');
         selectedPayment = choice.dataset.method;
         document.getElementById('payment-method-input').value = selectedPayment;
@@ -169,52 +290,48 @@
       });
     });
 
-    function removeFromCart(id) {
-      delete cart[id];
-      renderBill();
-    }
+    function removeLine(index) { cart.splice(index, 1); renderBill(); }
 
     function updateProcessButton() {
-      const hasItems = Object.keys(cart).length > 0;
-      document.getElementById('process-btn').disabled = !(hasItems && selectedPayment);
+      document.getElementById('process-btn').disabled = !(cart.length > 0 && selectedPayment);
+    }
+
+    const SIZE_LETTER = { small: 'S', medium: 'M', large: 'L' };
+    const SUGAR_LABEL = { none: 'no sugar', less: 'less sugar', extra: 'extra sugar' };
+    function detailText(l) {
+      const parts = [];
+      if (l.size) parts.push(SIZE_LETTER[l.size]);
+      if (l.temperature === 'iced') parts.push('iced');
+      if (l.sugar && l.sugar !== 'normal') parts.push(SUGAR_LABEL[l.sugar]);
+      if (l.note) parts.push('"' + l.note + '"');
+      return parts.join(' · ');
     }
 
     function renderBill() {
       const billList = document.getElementById('bill-list');
-      const hiddenInputs = document.getElementById('hidden-inputs');
-      const ids = Object.keys(cart);
-
-      hiddenInputs.innerHTML = '';
-      if (ids.length === 0) {
+      if (cart.length === 0) {
         billList.innerHTML = '<p class="bill-empty">Tap an item to add it.</p>';
         document.getElementById('bill-count').textContent = '0';
         document.getElementById('bill-total').textContent = '$0.00';
+        document.getElementById('lines-input').value = '';
         updateProcessButton();
         return;
       }
-
-      let total = 0;
-      let count = 0;
-      billList.innerHTML = ids.map(id => {
-        const item = cart[id];
-        total += item.price * item.qty;
-        count += item.qty;
-        return `<div class="receipt-line bill-item">
-          <span class="qty-name">${item.name} &times;${item.qty}</span>
-          <span class="dots"></span>
-          <span>$${(item.price * item.qty).toFixed(2)}</span>
-          <button type="button" class="remove" onclick="removeFromCart('${id}')">remove</button>
-        </div>`;
+      let total = 0, count = 0;
+      billList.innerHTML = cart.map((l, i) => {
+        total += l.price * l.qty;
+        count += l.qty;
+        const details = detailText(l);
+        return '<div class="receipt-line bill-item">'
+          + '<span class="qty-name">' + l.name + ' &times;' + l.qty
+          + (details ? '<span class="line-details">' + details.replace(/</g, '&lt;') + '</span>' : '')
+          + '</span><span class="dots"></span>'
+          + '<span>$' + (l.price * l.qty).toFixed(2) + '</span>'
+          + '<button type="button" class="remove" onclick="removeLine(' + i + ')">remove</button></div>';
       }).join('');
-
-      ids.forEach(id => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'qty_' + id;
-        input.value = cart[id].qty;
-        hiddenInputs.appendChild(input);
-      });
-
+      document.getElementById('lines-input').value = JSON.stringify(
+        cart.map(({ itemId, qty, size, sugar, temperature, note }) => ({ itemId, qty, size, sugar, temperature, note }))
+      );
       document.getElementById('bill-count').textContent = count;
       document.getElementById('bill-total').textContent = '$' + total.toFixed(2);
       updateProcessButton();

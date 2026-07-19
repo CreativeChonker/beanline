@@ -2,6 +2,8 @@ const { test, before, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const { db, migrate, resetDb } = require('../../testHelpers/db');
+const shops = require('../../models/shops');
+const menuItems = require('../../models/menuItems');
 
 before(async () => {
   await migrate();
@@ -20,6 +22,19 @@ async function ownerAgentWithShop(app, slug = 'blue-bottle', email = 'owner@blue
   });
   const shopRow = await db.query('SELECT id FROM shops WHERE slug = $1', [slug]);
   return { agent, shopId: shopRow.rows[0].id };
+}
+
+// Creates a shop (with its seeded starter menu, including Latte and Espresso) via the owner
+// signup flow, then signs up a staff member for that shop through the invite-code flow and
+// returns an agent authenticated as that staff member.
+async function staffAgentWithMenu(app, slug = 'blue-bottle', ownerEmail = 'owner@bluebottle.test', staffEmail = 'staff@bluebottle.test') {
+  const { shopId } = await ownerAgentWithShop(app, slug, ownerEmail);
+  const shopRow = await db.query('SELECT invite_code FROM shops WHERE id = $1', [shopId]);
+  const agent = request.agent(app);
+  await agent.post('/signup/staff').type('form').send({
+    name: 'Jamie Staff', email: staffEmail, password: 'hunter2', inviteCode: shopRow.rows[0].invite_code,
+  });
+  return { agent, shopId };
 }
 
 test('GET /pos requires auth', async () => {
@@ -51,7 +66,10 @@ test('POST /pos completes a walk-in sale with no customer, correct staff attribu
   const itemRow = await db.query('SELECT id FROM menu_items WHERE shop_id = $1 AND name = $2', [shopId, 'Latte']);
   const itemId = itemRow.rows[0].id;
 
-  const res = await agent.post('/pos').type('form').send({ ['qty_' + itemId]: '2', paymentMethod: 'cash' });
+  const res = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([{ itemId, qty: 2 }]),
+  });
   assert.equal(res.status, 200);
   assert.match(res.text, /Sale complete/);
 
@@ -66,7 +84,7 @@ test('POST /pos completes a walk-in sale with no customer, correct staff attribu
 test('POST /pos with no items selected re-renders with an error', async () => {
   const app = require('../../server');
   const { agent } = await ownerAgentWithShop(app);
-  const res = await agent.post('/pos').type('form').send({ paymentMethod: 'cash' });
+  const res = await agent.post('/pos').type('form').send({ paymentMethod: 'cash', lines: JSON.stringify([]) });
   assert.equal(res.status, 200);
   assert.match(res.text, /select at least one item/);
 });
@@ -75,7 +93,10 @@ test('POST /pos with a missing or invalid payment method re-renders with an erro
   const app = require('../../server');
   const { agent, shopId } = await ownerAgentWithShop(app);
   const itemRow = await db.query('SELECT id FROM menu_items WHERE shop_id = $1 AND name = $2', [shopId, 'Latte']);
-  const res = await agent.post('/pos').type('form').send({ ['qty_' + itemRow.rows[0].id]: '1', paymentMethod: 'bitcoin' });
+  const res = await agent.post('/pos').type('form').send({
+    paymentMethod: 'bitcoin',
+    lines: JSON.stringify([{ itemId: itemRow.rows[0].id, qty: 1 }]),
+  });
   assert.equal(res.status, 200);
   assert.match(res.text, /payment method/);
 });
@@ -87,7 +108,76 @@ test('POST /pos excludes unavailable items even if their id is submitted', async
   const itemId = itemRow.rows[0].id;
   await db.query('UPDATE menu_items SET available = false WHERE id = $1', [itemId]);
 
-  const res = await agent.post('/pos').type('form').send({ ['qty_' + itemId]: '1', paymentMethod: 'cash' });
+  const res = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([{ itemId, qty: 1 }]),
+  });
   assert.equal(res.status, 200);
-  assert.match(res.text, /select at least one item/);
+  assert.match(res.text, /no longer available/i);
+
+  const count = await db.query('SELECT COUNT(*)::int AS n FROM orders WHERE shop_id = $1', [shopId]);
+  assert.equal(count.rows[0].n, 0);
+});
+
+test('POST /pos with customized lines snapshots size pricing and stores customizations', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await staffAgentWithMenu(app);
+  const latte = await db.query("SELECT id FROM menu_items WHERE shop_id = $1 AND name = 'Latte'", [shopId]);
+  await db.query('UPDATE menu_items SET price_medium = 5.00, price_large = 5.50 WHERE id = $1', [latte.rows[0].id]);
+
+  const res = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([
+      { itemId: latte.rows[0].id, qty: 1, size: 'large', sugar: 'none', temperature: 'iced', note: 'oat milk' },
+      { itemId: latte.rows[0].id, qty: 2, size: 'small' },
+    ]),
+  });
+  assert.equal(res.status, 200);
+  assert.match(res.text, /iced/);
+  assert.match(res.text, /no sugar/);
+
+  const order = await db.query('SELECT items_json, total::float8 AS total FROM orders WHERE shop_id = $1', [shopId]);
+  const items = JSON.parse(order.rows[0].items_json);
+  assert.equal(items[0].size, 'large');
+  assert.equal(items[0].price, 5.5);
+  assert.equal(items[0].note, 'oat milk');
+  assert.equal(items[1].size, 'small');
+  assert.equal(order.rows[0].total, 5.5 + 2 * 4.5);
+});
+
+test('POST /pos rejects a size the item does not offer', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await staffAgentWithMenu(app);
+  const espresso = await db.query("SELECT id FROM menu_items WHERE shop_id = $1 AND name = 'Espresso'", [shopId]);
+
+  const res = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([{ itemId: espresso.rows[0].id, qty: 1, size: 'large' }]),
+  });
+  assert.match(res.text, /does not come in that size/i);
+  const count = await db.query('SELECT COUNT(*)::int AS n FROM orders WHERE shop_id = $1', [shopId]);
+  assert.equal(count.rows[0].n, 0);
+});
+
+test("POST /pos still cannot ring up another shop's item id", async () => {
+  const app = require('../../server');
+  const { agent } = await staffAgentWithMenu(app);
+  const otherShop = await shops.createShop(db, { name: 'Other', slug: 'other-shop' });
+  const foreign = await menuItems.createMenuItem(db, { shopId: otherShop.id, name: 'Foreign', price: 9, category: 'X' });
+
+  const res = await agent.post('/pos').type('form').send({
+    paymentMethod: 'cash',
+    lines: JSON.stringify([{ itemId: foreign.id, qty: 1 }]),
+  });
+  assert.match(res.text, /no longer available/i);
+});
+
+test('GET /pos renders category sections and hides pickers the shop disabled', async () => {
+  const app = require('../../server');
+  const { agent, shopId } = await staffAgentWithMenu(app);
+  await db.query('UPDATE shops SET pos_show_sugar = false WHERE id = $1', [shopId]);
+  const res = await agent.get('/pos');
+  assert.match(res.text, /class="pos-section"/);
+  assert.doesNotMatch(res.text, /data-picker="sugar"/);
+  assert.match(res.text, /data-picker="size"/);
 });
