@@ -144,14 +144,15 @@
       <div class="add-item-panel" id="add-item-panel">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h13a3 3 0 0 1 0 6h-1"/><path d="M4 8v7a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4V8"/></svg> Add a New Item</h3>
         <% const cats = [...new Set(items.map((i) => i.category))]; %>
+        <% const isNewCat = values.category && !cats.includes(values.category); %>
         <form method="POST" action="/menu" class="add-item-form" enctype="multipart/form-data">
           <div class="field span-2"><label for="name">Name</label><input id="name" name="name" type="text" required placeholder="Enter item name" value="<%= values.name || '' %>"></div>
           <div class="field"><label for="categorySelect">Category</label>
             <select id="categorySelect" name="category">
               <% cats.forEach((c) => { %><option value="<%= c %>"<%= values.category === c ? ' selected' : '' %>><%= c %></option><% }) %>
-              <option value="__new__">New category…</option>
+              <option value="__new__"<%= isNewCat ? ' selected' : '' %>>New category…</option>
             </select>
-            <input id="categoryNew" name="categoryNew" type="text" placeholder="New category name" style="display:none;margin-top:6px;" value="">
+            <input id="categoryNew" name="categoryNew" type="text" placeholder="New category name" style="<%= isNewCat ? '' : 'display:none;' %>margin-top:6px;" value="<%= isNewCat ? values.category : '' %>">
           </div>
           <div class="field"><label for="itemType">Type</label>
             <select id="itemType" name="itemType"><option value="drink" <%= values.itemType === 'drink' ? 'selected' : '' %>>Drink</option><option value="food" <%= values.itemType === 'food' ? 'selected' : '' %>>Food</option></select>

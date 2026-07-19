@@ -242,3 +242,15 @@ test('the row overflow menu holds Remove and the row keeps Edit and Mark unavail
   assert.match(res.text, /Mark unavailable/);
   assert.match(res.text, /Remove/);
 });
+
+test('a validation error keeps a typed new category in the re-rendered form', async () => {
+  const app = require('../../server');
+  const { agent } = await ownerAgentWithShop(app);
+  const res = await agent.post('/menu')
+    .field('name', 'Photo Bun').field('category', 'Pastries').field('price', '3.00')
+    .field('itemType', 'food').field('priceMedium', '-1');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /valid price/i);
+  assert.match(res.text, /id="categoryNew"[^>]*value="Pastries"/);
+  assert.match(res.text, /value="__new__"\s+selected/);
+});
